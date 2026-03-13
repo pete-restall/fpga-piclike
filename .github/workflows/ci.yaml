@@ -6,9 +6,9 @@ on:
     branches:
       - "master"
     paths:
-      - ".github/workflows"
-      - "src"
-      - "build"
+      - ".github/workflows/**"
+      - "src/**"
+      - "build/**"
 
 jobs:
   build:
