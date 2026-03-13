@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [ $default-branch ]
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Tools
+        run: |
+          sudo apt-get -q -y update &&
+          sudo apt-get -q -y fpga-icestorm iverilog nextpnr-ice40 yosys yosys-abc;
+
+      - name: Test and Synthesise
+        run: |
+          cd "${GITHUB_WORKSPACE}" && \
+          build/test.sh && \
+          build/verify.sh && \
+          build/synthesise.sh;
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: piclike-out
+          path: |
+            "${GITHUB_WORKSPACE}/out/tests/passed"
+            "${GITHUB_WORKSPACE}/out/tests/failed"
+            "${GITHUB_WORKSPACE}/out/proofs/passed"
+            "${GITHUB_WORKSPACE}/out/proofs/failed"
+            "${GITHUB_WORKSPACE}/out/synthesised"
