@@ -31,9 +31,10 @@ jobs:
       - uses: actions/upload-artifact@v6
         with:
           name: piclike-out
+          if-no-files-found: error
           path: |
-            {{github.workspace}}/out/tests/passed
-            {{github.workspace}}/out/tests/failed
-            {{github.workspace}}/out/proofs/passed
-            {{github.workspace}}/out/proofs/failed
-            {{github.workspace}}/out/synthesised
+            ${{github.workspace}}/out/tests/passed
+            ${{github.workspace}}/out/tests/failed
+            ${{github.workspace}}/out/proofs/passed
+            ${{github.workspace}}/out/proofs/failed
+            ${{github.workspace}}/out/synthesised
