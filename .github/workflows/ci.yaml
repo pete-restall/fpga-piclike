@@ -37,4 +37,4 @@ jobs:
             ${{github.workspace}}/out/tests/failed
             ${{github.workspace}}/out/proofs/passed
             ${{github.workspace}}/out/proofs/failed
-            ${{github.workspace}}/out/synthesised
+            ${{github.workspace}}/out/synthesis
