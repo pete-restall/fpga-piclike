@@ -32,8 +32,8 @@ jobs:
         with:
           name: piclike-out
           path: |
-            "${GITHUB_WORKSPACE}/out/tests/passed"
-            "${GITHUB_WORKSPACE}/out/tests/failed"
-            "${GITHUB_WORKSPACE}/out/proofs/passed"
-            "${GITHUB_WORKSPACE}/out/proofs/failed"
-            "${GITHUB_WORKSPACE}/out/synthesised"
+            ${GITHUB_WORKSPACE}/out/tests/passed
+            ${GITHUB_WORKSPACE}/out/tests/failed
+            ${GITHUB_WORKSPACE}/out/proofs/passed
+            ${GITHUB_WORKSPACE}/out/proofs/failed
+            ${GITHUB_WORKSPACE}/out/synthesised

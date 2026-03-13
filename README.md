@@ -10,3 +10,6 @@ Required packages for building, testing and verification:
 - `iverilog` - Verilog simulator
 - `nextpnr` - synthesis tool for placing and routing
 - `yosys` - various front-end tools for formal verification and synthesis
+
+## Build Status
+[![CI](https://github.com/pete-restall/fpga-piclike/actions/workflows/ci.yaml/badge.svg)](https://github.com/pete-restall/fpga-piclike/actions/workflows/ci.yaml)
