@@ -3,7 +3,11 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches: [ $default-branch ]
+    branches:
+      - "master"
+    paths:
+      - "src"
+      - "build"
 
 jobs:
   build:

@@ -9,5 +9,5 @@ module InstructionDecoder #(
 
 	Instructions #(.INSTRUCTION_BIT_WIDTH(INSTRUCTION_BIT_WIDTH)) instructions ();
 
-	assign is_destination_w = (bus & 128) == 0 && INSTRUCTION_BIT_WIDTH != 16;
+	assign is_destination_w = (bus & 128) == 0;
 endmodule
