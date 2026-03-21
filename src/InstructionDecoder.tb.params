@@ -1,3 +1,3 @@
--s InstructionDecoderTestbench -PInstructionDecoderTestbench.INSTRUCTION_BIT_WIDTH=14 -DVCD_FILENAME="InstructionDecoder.tb.14bit.vcd"
--s InstructionDecoderTestbench -PInstructionDecoderTestbench.INSTRUCTION_BIT_WIDTH=16 -DVCD_FILENAME="InstructionDecoder.tb.16bit.vcd"
--s InstructionDecoderTestbench -PInstructionDecoderTestbench.INSTRUCTION_BIT_WIDTH=18 -DVCD_FILENAME="InstructionDecoder.tb.18bit.vcd"
+-PInstructionDecoderTestbench.INSTRUCTION_BIT_WIDTH=14 -DVCD_FILENAME="InstructionDecoder.tb.14bit.vcd"
+-PInstructionDecoderTestbench.INSTRUCTION_BIT_WIDTH=16 -DVCD_FILENAME="InstructionDecoder.tb.16bit.vcd"
+-PInstructionDecoderTestbench.INSTRUCTION_BIT_WIDTH=18 -DVCD_FILENAME="InstructionDecoder.tb.18bit.vcd"

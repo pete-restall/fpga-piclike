@@ -41,11 +41,13 @@ run_testbench() {
 
 	testbench_dir="$(dirname "${testbench}")";
 	testbench_name="$(basename "${testbench}")";
+	dut_module_name="$(basename -s.tb "${testbench_name}")";
+	testbench_module_name="${dut_module_name}Testbench";
 
 	testing_parent_dir="${test_out_dir}/${testbench_dir}";
 	mkdir -p "${testing_parent_dir}";
 	testing_dir="$(mktemp -d "${testing_parent_dir}/XXXX")";
-	iverilog -g2012 "-I${testbench_dir}" "-y${testbench_dir}" -Y.sv -o "${testing_dir}/${testbench_name}.vvp" ${args} "${testbench}.sv";
+	iverilog -g2012 "-I${testbench_dir}" "-y${testbench_dir}" -Y.sv -o "${testing_dir}/${testbench_name}.vvp" -s "${testbench_module_name}" ${args} "${testbench}.sv";
 	if [ $? -eq 0 ]; then
 		pushd "${testing_dir}";
 		vvp "${testbench_name}.vvp";
