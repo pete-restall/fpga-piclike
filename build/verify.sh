@@ -13,6 +13,8 @@ run_proofs() {
 	for proof_sv in ${proofs}; do
 		number_of_proofs=$((${number_of_proofs} + 1));
 		proof="$(dirname "${proof_sv}")/$(basename -s.sv "${proof_sv}")";
+
+		set +e;
 		if [ -f "${proof}.params" ]; then
 			cat "${proof}.params";
 		else
@@ -21,10 +23,11 @@ run_proofs() {
 		if [ $? -ne 0 ]; then
 			number_of_proof_failures=$((${number_of_proof_failures} + 1));
 		fi
+		set -e;
 	done
 
 	echo "---";
-	echo "[RESULT] ${number_of_proof_failures} out of ${number_of_proofs} proofs failed.";
+	echo "[RESULT] ${number_of_proofs} proofs; $((${number_of_proofs} - ${number_of_proof_failures})) passed, ${number_of_proof_failures} failed.";
 	if [ ${number_of_proof_failures} -ne 0 ]; then
 		return 1;
 	else

@@ -13,6 +13,8 @@ run_testbenches() {
 	for testbench_sv in ${testbenches}; do
 		number_of_testbenches=$((${number_of_testbenches} + 1));
 		testbench="$(dirname "${testbench_sv}")/$(basename -s.sv "${testbench_sv}")";
+
+		set +e;
 		if [ -f "${testbench}.params" ]; then
 			cat "${testbench}.params";
 		else
@@ -21,10 +23,11 @@ run_testbenches() {
 		if [ $? -ne 0 ]; then
 			number_of_testbench_failures=$((${number_of_testbench_failures} + 1));
 		fi
+		set -e;
 	done
 
 	echo "---";
-	echo "[RESULT] ${number_of_testbench_failures} out of ${number_of_testbenches} testbenches failed.";
+	echo "[RESULT] ${number_of_testbenches} testbenches; $((${number_of_testbenches} - ${number_of_testbench_failures})) passed, ${number_of_testbench_failures} failed.";
 	if [ ${number_of_testbench_failures} -ne 0 ]; then
 		return 1;
 	else

@@ -33,12 +33,13 @@ module InstructionDecoderTestbench #(
 	end
 
 	`BEGIN_TEST_SUITE(test_runner)
-		0: addwf__d_bit_is_0__expect_is_destination_w_true();
-		1: addwf__d_bit_is_1__expect_is_destination_w_false();
+		`TEST(addwf__d_bit_is_0__expect_is_destination_w_true)
+		`TEST(addwf__d_bit_is_1__expect_is_destination_w_false)
 	`END_TEST_SUITE
 
-	task addwf__d_bit_is_0__expect_is_destination_w_true();
-		for (integer w = 0; w < instructions.NUMBER_OF_W; w++) begin
+	task addwf__d_bit_is_0__expect_is_destination_w_true;
+		integer w;
+		for (w = 0; w < instructions.NUMBER_OF_W; w += 1) begin
 			@(posedge clock) dut_bus = instructions.addwf(w, any_f(), instructions.W);
 			@(posedge clock) `ASSERT(dut_is_destination_w);
 		end
@@ -48,8 +49,9 @@ module InstructionDecoderTestbench #(
 		any_f = $urandom_range(0, 127);
 	endfunction
 
-	task addwf__d_bit_is_1__expect_is_destination_w_false();
-		for (integer w = 0; w < instructions.NUMBER_OF_W; w++) begin
+	task addwf__d_bit_is_1__expect_is_destination_w_false;
+		integer w;
+		for (w = 0; w < instructions.NUMBER_OF_W; w += 1) begin
 			@(posedge clock) dut_bus = instructions.addwf(w, any_f(), instructions.F);
 			@(posedge clock) `ASSERT(!dut_is_destination_w);
 		end
