@@ -4,7 +4,7 @@ module Instructions #(
 	parameter integer INSTRUCTION_BIT_WIDTH = 16
 );
 	initial if (INSTRUCTION_BIT_WIDTH < 14 || INSTRUCTION_BIT_WIDTH > 32) begin
-		$display("Instruction bus must have a bit-width in the range [14, 32]");
+		$display("[DESIGN ERROR] Instruction bus must have a bit-width in the range [14, 32]");
 		$exit(1);
 	end
 

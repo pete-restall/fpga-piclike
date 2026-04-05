@@ -51,6 +51,8 @@ run_proof() {
 	mkdir -p "${proving_parent_dir}";
 	proving_dir="$(mktemp -d "${proving_parent_dir}/XXXX")";
 
+# TODO: USE sv2v, which allows the use of interfaces, etc.  There's no module / include discovery, however, so think of a better way to add all files to its input.
+# With sv2v the resulting Verilog ought to be more consistently parsed between tools, but the names of the signals will differ.
 	iverilog -g2012 "-I${proof_dir}" "-y${proof_dir}" -Y.sv -o /dev/null "-Mprefix=${proving_dir}/proof.deps" -i -s "${proof_module_name}" "${proof}.sv";
 	if [ $? -eq 0 ]; then
 		dep_modules=$(cat "${proving_dir}/proof.deps" | grep '^M ' | sort | uniq | sed -E 's/^M (.+)$/\1/' | grep -v "^${proof}.sv\$");
@@ -65,21 +67,26 @@ run_proof() {
 			[options]
 			bmc:
 			mode bmc
+			multiclock on
 			--
 			prove:
 			mode prove
+			multiclock on
 			--
 			cover:
 			mode cover
+			multiclock on
 			--
 
 			[engines]
 			smtbmc
 
 			[script]
-			read -sv -formal "${proof}.sv"
-			$(for m in ${dep_modules}; do echo "read -sv \"${m}\""; done)
-			$(for i in ${dep_includes}; do echo "read -sv \"${i}\""; done)
+			plugin -i slang
+			read_slang --std 1800-2023 "${proof}.sv"
+			#read -sv -formal "${proof}.sv"
+			$(for m in ${dep_modules}; do echo "read_slang --std 1800-2023 \"${m}\" #read -sv \"${m}\""; done)
+			$(for i in ${dep_includes}; do echo "read_slang --std 1800-2023 \"${m}\" #read -sv \"${i}\""; done)
 			hierarchy -check -top ${proof_module_name} ${args}
 			prep -top ${proof_module_name}
 
