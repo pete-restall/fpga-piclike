@@ -1,7 +1,7 @@
 `default_nettype none
 `timescale 10ns/1ns
 
-`include "TestbenchRunner.inc.sv"
+`include "TestbenchRunner.h.sv"
 
 module InstructionDecoderTestbench #(
 	parameter integer INSTRUCTION_BIT_WIDTH

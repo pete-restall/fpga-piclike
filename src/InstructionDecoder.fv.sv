@@ -1,7 +1,7 @@
 `default_nettype none
 `timescale 10ns/1ns
 
-`include "ProofRunner.inc.sv"
+`include "ProofRunner.h.sv"
 
 module InstructionDecoderVerification #(
 	parameter integer INSTRUCTION_BIT_WIDTH = 14
