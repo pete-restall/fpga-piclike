@@ -4,7 +4,7 @@
 `include "TestbenchRunner.h.sv"
 
 module InstructionDecoderTestbench #(
-	parameter integer INSTRUCTION_BIT_WIDTH
+	parameter integer INSTRUCTION_BIT_WIDTH = 14
 );
 	bit sync_reset;
 	bit clock;

@@ -19,22 +19,23 @@ jobs:
       - name: Install Tools
         run: |
           sudo apt-get -q -y update &&
-          sudo apt-get -q -y install fpga-icestorm iverilog nextpnr-ice40 yosys yosys-abc;
+          sudo apt-get -q -y install fpga-icestorm iverilog nextpnr-ice40 yosys yosys-abc &&
+          npm install -g --ignore-scripts wavedrom;
 
       - name: Test and Synthesise
         run: |
-          cd "${GITHUB_WORKSPACE}" && \
-          build/test.sh && \
-          build/verify.sh && \
-          build/synthesise.sh;
+          cd "${GITHUB_WORKSPACE}/build" && \
+          ./test.sh && \
+          ./verify.sh && \
+          ./synthesise.sh;
 
       - uses: actions/upload-artifact@v6
         with:
           name: piclike-out
           if-no-files-found: error
           path: |
-            ${{github.workspace}}/out/tests/passed
-            ${{github.workspace}}/out/tests/failed
-            ${{github.workspace}}/out/proofs/passed
-            ${{github.workspace}}/out/proofs/failed
-            ${{github.workspace}}/out/synthesis
+            ${{github.workspace}}/build/out/tests/passed
+            ${{github.workspace}}/build/out/tests/failed
+            ${{github.workspace}}/build/out/proofs/passed
+            ${{github.workspace}}/build/out/proofs/failed
+            ${{github.workspace}}/build/out/synthesis
