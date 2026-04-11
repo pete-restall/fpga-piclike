@@ -5,8 +5,8 @@
 	bit __proof_sync_reset; \
 	bit __proof_proof_clock; \
 	bit __proof_clock; \
-	bit __proof_past; \
-	bit __proof_past_after_reset; \
+	bit[31:0] __proof_past; \
+	bit[31:0] __proof_past_after_reset; \
 \
 	initial assume(__proof_sync_reset); \
 	initial assume(__proof_past == 0 && __proof_past_after_reset == 0); \

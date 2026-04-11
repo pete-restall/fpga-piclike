@@ -7,9 +7,10 @@ NULL_FD := /dev/null
 
 SRC_EXT := sv
 OBJ_EXT := v
+SBY_OBJ_EXT := sby
 
-SRC_H_EXT := h.$(SRC_EXT)
-SRC_IF_EXT := if.$(SRC_EXT)
+H_SRC_EXT := h.$(SRC_EXT)
+IF_SRC_EXT := if.$(SRC_EXT)
 TB_SRC_EXT := tb.$(SRC_EXT)
 FV_SRC_EXT := fv.$(SRC_EXT)
 TOP_SRC_EXT := top.$(SRC_EXT)
@@ -25,29 +26,36 @@ FV_MODULE_SUFFIX := Verification
 TOP_MODULE_SUFFIX :=
 
 IVERILOG := iverilog
-IVERILOG_ALL_FLAGS := -g2012 -Y.$(SRC_EXT) -Y.$(SRC_IF_EXT)
+IVERILOG_ALL_FLAGS := -g2012 -Y.$(SRC_EXT) -Y.$(IF_SRC_EXT)
 IVERILOG_DEPS_FLAGS := $(IVERILOG_ALL_FLAGS) -i
 IVERILOG_SRC_FLAGS := $(IVERILOG_ALL_FLAGS)
 
 SV2V := sv2v
-SV2V_ALL_FLAGS :=
+SV2V_ALL_FLAGS := --siloed
 
-TB_SRC := $(shell find '$(SRC_DIR)' -type f -name '*.$(TB_SRC_EXT)')
-TB_OBJ := $(patsubst $(SRC_DIR)/%,$(OUT_OBJ_DIR)/%,$(TB_SRC:%.$(SRC_EXT)=%.$(OBJ_EXT)))
+########
 
-FV_SRC := $(shell find '$(SRC_DIR)' -type f -name '*.$(FV_SRC_EXT)')
-FV_OBJ := $(patsubst $(SRC_DIR)/%,$(OUT_OBJ_DIR)/%,$(FV_SRC:%.$(SRC_EXT)=%.$(OBJ_EXT)))
+find_src = $(call find_files,$(SRC_DIR),$(1))
+find_files = $(shell find '$(1)' -type f -name '$(2)' 2>$(NULL_FD))
+src_to_obj = $(patsubst $(SRC_DIR)/%,$(OUT_OBJ_DIR)/%,$(1:%.$(2)=%.$(3)))
+doc_to_obj = $(patsubst $(SRC_DIR)/%,$(DOC_OBJ_DIR)/%,$(1:%.$(2)=%.$(3)))
 
-TOP_SRC := $(shell find '$(SRC_DIR)' -type f -name '*.$(TOP_SRC_EXT)')
-TOP_OBJ := $(patsubst $(SRC_DIR)/%,$(OUT_OBJ_DIR)/%,$(TOP_SRC:%.$(SRC_EXT)=%.$(OBJ_EXT)))
+TB_SRC := $(call find_src,*.$(TB_SRC_EXT))
+TB_OBJ := $(call src_to_obj,$(TB_SRC),$(SRC_EXT),$(OBJ_EXT))
 
-DEPS := $(shell find '$(OUT_OBJ_DIR)' -type f -name '*.$(DEPS_EXT)' 2>$(NULL_FD))
+FV_SRC := $(call find_src,*.$(FV_SRC_EXT))
+FV_OBJ := $(call src_to_obj,$(FV_SRC),$(SRC_EXT),$(SBY_OBJ_EXT))
 
-DOC_MD_SRC := $(shell find '$(SRC_DIR)' -type f -name '*.$(DOC_MD_SRC_EXT)')
-DOC_MD_OBJ := $(patsubst $(SRC_DIR)/%,$(DOC_OBJ_DIR)/%,$(DOC_MD_SRC:%.$(DOC_MD_SRC_EXT)=%.$(DOC_MD_OBJ_EXT)))
+TOP_SRC := $(call find_src,*.$(TOP_SRC_EXT))
+TOP_OBJ := $(call src_to_obj,$(TOP_SRC),$(SRC_EXT),$(OBJ_EXT))
 
-DOC_WAVEDROM_SRC := $(shell find '$(SRC_DIR)' -type f -name '*.$(DOC_WAVEDROM_SRC_EXT)')
-DOC_WAVEDROM_OBJ := $(patsubst $(SRC_DIR)/%,$(DOC_OBJ_DIR)/%,$(DOC_WAVEDROM_SRC:%.$(DOC_WAVEDROM_SRC_EXT)=%.$(DOC_WAVEDROM_OBJ_EXT)))
+DEPS := $(call find_files,$(OUT_OBJ_DIR),*.$(DEPS_EXT))
+
+DOC_MD_SRC := $(call find_src,*.$(DOC_MD_SRC_EXT))
+DOC_MD_OBJ := $(call doc_to_obj,$(DOC_MD_SRC),$(DOC_MD_SRC_EXT),$(DOC_MD_OBJ_EXT))
+
+DOC_WAVEDROM_SRC := $(call find_src,*.$(DOC_WAVEDROM_SRC_EXT))
+DOC_WAVEDROM_OBJ := $(call doc_to_obj,$(DOC_WAVEDROM_SRC),$(DOC_WAVEDROM_SRC_EXT),$(DOC_WAVEDROM_OBJ_EXT))
 
 .PHONY: bits clean docs help pnr
 
@@ -90,37 +98,46 @@ clean:
 
 prefixed_src_dirs = $(call prefixed_parent_dirs,$(1),$(SRC_DIR),$<)
 prefixed_parent_dirs = $(shell next_dir(){ d=$$(dirname $$1) && echo -n "$(1)$${d} "; [ "_$${d}" != '_$(2)' ] && next_dir "$${d}"; } && next_dir '$(3)')
-module_name = $(basename $(notdir $(patsubst %.$(TOP_SRC_EXT),%$(TOP_MODULE_SUFFIX),$(patsubst %.$(FV_SRC_EXT),%$(FV_MODULE_SUFFIX),$(<:%.$(TB_SRC_EXT)=%$(TB_MODULE_SUFFIX))))))
+top_module_name_from_src = $(call top_module_name_from,$<)
+top_module_name_from = $(basename $(notdir $(patsubst %.$(TOP_SRC_EXT),%$(TOP_MODULE_SUFFIX),$(patsubst %.$(FV_SRC_EXT),%$(FV_MODULE_SUFFIX),$(1:%.$(TB_SRC_EXT)=%$(TB_MODULE_SUFFIX))))))
+top_module_name_from_deps = $(call top_module_name_from,$(<:%.$(DEPS_EXT)=%.$(SRC_EXT)))
 
 $(OUT_OBJ_DIR)/%.$(DEPS_EXT): $(SRC_DIR)/%.$(SRC_EXT)
 	@set -e; \
-	echo '[DEPS  ]: $(module_name) ($< -> $@)'; \
+	echo '[DEPS  ] $(top_module_name_from_src) ($< -> $@)'; \
 	mkdir -p '$(dir $@)'; \
-	$(IVERILOG) $(IVERILOG_DEPS_FLAGS) $(call prefixed_src_dirs,-I) $(call prefixed_src_dirs,-y) -o '$(NULL_FD)' '-Mprefix=$@.iv' -s '$(module_name)' '$<'; \
+	$(IVERILOG) $(IVERILOG_DEPS_FLAGS) $(call prefixed_src_dirs,-I) $(call prefixed_src_dirs,-y) -o '$(NULL_FD)' '-Mprefix=$@.iv' -s '$(top_module_name_from_src)' '$<'; \
 	echo "$(@:%.$(DEPS_EXT)=%.$(OBJ_EXT)) $@ : $$(cat '$@.iv' | sed -E 's/^[IM] (.+)$$/\1/' | sort | uniq | paste -sd' ' -)" > '$@';
 
 .PRECIOUS: $(OUT_OBJ_DIR)/%.$(DEPS_EXT)
 -include $(DEPS)
 
+$(OUT_OBJ_DIR)/%.$(SBY_OBJ_EXT): $(OUT_OBJ_DIR)/%.$(OBJ_EXT)
+	@set -e; \
+	echo '[SBYGEN] $(top_module_name_from_obj) ($< -> $@)'; \
+	mkdir -p '$(dir $@)'; \
+	echo '    TODO: GENERATE THE SBY FILE HERE...'; \
+	touch $@;
+
 $(OUT_OBJ_DIR)/%.$(OBJ_EXT): $(OUT_OBJ_DIR)/%.$(DEPS_EXT)
 	@set -e; \
+	echo '[SV2V  ] $(top_module_name_from_deps) ($< -> $@)'; \
 	mkdir -p '$(dir $@)'; \
-	echo 'TODO: RUN sv2v TO CREATE ONE BIG VERILOG95 FILE $< -> $@'; \
-	touch '$@';
+	$(SV2V) $(SV2V_ALL_FLAGS) --top '$(top_module_name_from_deps)' $$(cat '$<' | sed -E 's/^[^:]+: //g') > $@;
 
 $(OUT_OBJ_DIR)/%.$(TOP_OBJ_EXT): $(SRC_DIR)/%.$(PCF_EXT)
 	@set -e; \
-	echo '[CNSTRN]: $< -> $@'; \
+	echo '[CNSTRN] $< -> $@'; \
 	cp '$<' '$@';
 
 $(OUT_DOC_DIR)/%.$(DOC_MD_OBJ_EXT): $(SRC_DIR)/%.$(DOC_MD_SRC_EXT)
 	@set -e; \
-	echo '[DOCSMD]: $< -> $@'; \
+	echo '[DOCSMD] $< -> $@'; \
 	mkdir -p '$(dir $@)'; \
 	cp '$<' '$@';
 
 $(OUT_DOC_DIR)/%.$(DOC_WAVEDROM_OBJ_EXT).svg: $(SRC_DIR)/%.$(DOC_WAVEDROM_SRC_EXT)
 	@set -e; \
-	echo '[DOCSWD]: $< -> $@'; \
+	echo '[DOCSWD] $< -> $@'; \
 	mkdir -p '$(dir $@)'; \
 	wavedrom --input '$<' --indent 4 > '$@';

@@ -9,9 +9,7 @@ module InstructionDecoderTestbench #(
 	bit sync_reset;
 	bit clock;
 
-	TestbenchRunner #(
-		.VCD_FILENAME(``VCD_FILENAME)
-	) test_runner (
+	TestbenchRunner test_runner (
 		.sync_reset(sync_reset),
 		.clock(clock)
 	);

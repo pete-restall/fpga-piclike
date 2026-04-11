@@ -2,7 +2,7 @@
 `timescale 1ns/100ps
 
 module TestbenchRunner #(
-	parameter string VCD_FILENAME,
+	parameter string VCD_FILENAME = "dump.vcd",
 	parameter integer TIMEOUT_CLOCKS = 1024
 )(
 	output bit sync_reset,
@@ -39,7 +39,7 @@ module TestbenchRunner #(
 		end
 	endtask
 
-	task fail_if(bool has_failed, string reason);
+	task fail_if(bit has_failed, string reason);
 		if (has_failed) begin
 			$display("Failing because ", reason);
 			$finish(1);
