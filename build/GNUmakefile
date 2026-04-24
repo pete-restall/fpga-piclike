@@ -17,14 +17,17 @@ ARGS_EXT := args
 MAX_ARGS := 16
 
 TB_EXT := tb
+FV_EXT := fv
+TOP_EXT := top
+
 H_SRC_EXT := h.$(SRC_EXT)
 IF_SRC_EXT := if.$(SRC_EXT)
 TB_SRC_EXT := $(TB_EXT).$(SRC_EXT)
 TB_OBJ_EXT := $(TB_EXT).$(OBJ_EXT)
-FV_SRC_EXT := fv.$(SRC_EXT)
-FV_OBJ_EXT := fv.$(OBJ_EXT)
-TOP_SRC_EXT := top.$(SRC_EXT)
-TOP_OBJ_EXT := top.$(OBJ_EXT)
+FV_SRC_EXT := $(FV_EXT).$(SRC_EXT)
+FV_OBJ_EXT := $(FV_EXT).$(OBJ_EXT)
+TOP_SRC_EXT := $(TOP_EXT).$(SRC_EXT)
+TOP_OBJ_EXT := $(TOP_EXT).$(OBJ_EXT)
 DOC_MD_SRC_EXT := md
 DOC_MD_OBJ_EXT := md
 DOC_WAVEDROM_SRC_EXT := wd
@@ -116,12 +119,24 @@ clean:
 	@echo '[CLEAN   ] Cleaning up';
 	rm -rf '$(OUT_DIR)';
 
+.PHONY: blah
+blah: ################### TODO: REMOVE THIS - TESTING PURPOSES ONLY !
+	@echo $(call basename_dot_suffix,some_file.tb.ext)
+	@echo $(call top_module_name_from,some_file.tb.ext)
+	@echo $(call basename_dot_suffix,some_file.tb.4.ext)
+	@echo $(call top_module_name_from,some_file.tb.4.ext)
+
 prefixed_src_dirs_from_src = $(call prefixed_src_dirs_from,$(1),$<)
 prefixed_src_dirs_from = $(call prefixed_parent_dirs,$(1),$(SRC_DIR),$(2))
 prefixed_parent_dirs = $(shell next_dir(){ d=$$(dirname $$1) && echo -n "$(1)$${d} "; [ "$$?" -eq 0 -a "_$${d}" != '_$(2)' -a "_$${d}" != "_." -a "_$${d}" != "_/" ] && next_dir "$${d}"; } && [ ! -z '$(3)' ] && next_dir '$(3)')
+
 top_module_name_from_src = $(call top_module_name_from,$<)
-top_module_name_from = $(basename $(notdir $(patsubst %.$(TOP_SRC_EXT),%$(TOP_MODULE_SUFFIX),$(patsubst %.$(FV_SRC_EXT),%$(FV_MODULE_SUFFIX),$(1:%.$(TB_SRC_EXT)=%$(TB_MODULE_SUFFIX))))))
-top_module_name_from_make_deps = $(call top_module_name_from,$(<:%.$(MAKE_DEPS_EXT)=%.$(SRC_EXT)))
+top_module_name_from = $(notdir \
+	$(patsubst %.$(TOP_EXT),%$(TOP_MODULE_SUFFIX), \
+	$(patsubst %.$(FV_EXT),%$(FV_MODULE_SUFFIX), \
+	$(patsubst %.$(TB_EXT),%$(TB_MODULE_SUFFIX), \
+	$(call basename_dot_suffix,$(1))))) \
+)
 
 #$(OUT_OBJ_DIR)/%.$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(SRC_EXT)
 #	@set -e; \
@@ -229,15 +244,28 @@ all_possible_args := $(shell seq $(MAX_ARGS))
 define DEFINE_PARAMETERISED_TOP_RECIPES
 $(OUT_TESTBENCHES_DIR)/%.$(i).$(IVERILOG_DEPS_EXT): $(SRC_DIR)/%.$(SRC_EXT) $(OUT_TESTBENCHES_DIR)/%.$(i).$(ARGS_EXT)
 	@set -e; \
-	echo '[DEPENDS ] $$(call top_module_name_from_src) ($$(lastword $$^) -> $$@)'; \
+	top_module_name='$$(call top_module_name_from_src)'; \
+	args_file='$$(lastword $$^)'; \
+	echo "[DEPENDS ] $$$${top_module_name}: Discovering dependencies ($$$${args_file} -> $$@)"; \
 	mkdir -p '$$(dir $$@)'; \
-	$$(IVERILOG) $$(IVERILOG_DEPS_FLAGS) $$(call prefixed_src_dirs_from_src,-I) $$(call prefixed_src_dirs_from_src,-y) $$$$(cat '$$(lastword $$^)') -o '$(NULL_FD)' '-Mprefix=$$@' -s '$$(call top_module_name_from_src)' '$$<';
+	$$(IVERILOG) $$(IVERILOG_DEPS_FLAGS) $$(call prefixed_src_dirs_from_src,-I) $$(call prefixed_src_dirs_from_src,-y) $$$$(cat "$$$${args_file}") -o '$(NULL_FD)' '-Mprefix=$$@' -s "$$$${top_module_name}" '$$<';
 
 # TODO: OUT_VERIFICATION_DIR and OUT_TOPMODULES_DIR
+
+_remove_dot_$(i)_suffix = $$(patsubst %.$(i),%,$$(1))
 endef
 
 $(foreach i,$(all_possible_args), \
     $(eval $(DEFINE_PARAMETERISED_TOP_RECIPES)) \
+)
+
+basename_dot_suffix = $(call _basename_dot_suffix,$(1),$(all_possible_args))
+_basename_dot_suffix = $(let head tail,$(2), \
+	$(call _remove_dot_$(head)_suffix, \
+		$(if $(tail), \
+			$(call _basename_dot_suffix,$(1),$(tail)), \
+			$(basename $(1))) \
+	) \
 )
 
 .PHONY: %.$(IVERILOG_DEPS_EXT)
@@ -248,29 +276,31 @@ $(foreach i,$(all_possible_args), \
 .PRECIOUS: %.$(MAKE_DEPS_EXT)
 %.$(MAKE_DEPS_EXT): %.$(FILE_DEPS_EXT)
 	@set -e; \
-	echo '[DEPENDS ] $(call top_module_name_from_src) ($< -> $@)'; \
+	echo '[DEPENDS ] $(call top_module_name_from_src): Converting dependencies ($< -> $@)'; \
 	echo "$(@:%.$(DEPS_EXT)=%.$(OBJ_EXT)) $@ : $$(cat '$<')" > '$@';
 
 .PRECIOUS: %.$(FILE_DEPS_EXT)
 %.$(FILE_DEPS_EXT): %.$(IVERILOG_DEPS_EXT)
 	@set -e; \
-	echo '[DEPENDS ] $(call top_module_name_from_src) ($< -> $@)'; \
+	echo '[DEPENDS ] $(call top_module_name_from_src): Converting dependencies ($< -> $@)'; \
 	cat '$<' | sed -E 's/^[IM] (.+)$$/\1/' | sort | uniq | paste -sd' ' - > '$@';
 
 .PRECIOUS: %.$(SV2V_DEPS_EXT)
 %.$(SV2V_DEPS_EXT): %.$(FILE_DEPS_EXT)
 	@set -e; \
-	echo '[DEPENDS ] $(call top_module_name_from_src) ($< -> $@)'; \
+	echo '[DEPENDS ] $(call top_module_name_from_src): Converting dependencies ($< -> $@)'; \
 	cp '$<' '$@';
 
 %.$(OBJ_EXT): %.$(ARGS_EXT) %.$(SV2V_DEPS_EXT)
 	@set -e; \
-	echo '[SV2V    ] $(call top_module_name_from_src) ($< -> $@)'; \
+	top_module_name='$(call top_module_name_from_src)'; \
+	deps_file='$(lastword $^)'; \
+	echo "[SV2V    ] $${top_module_name}: Transpiling ($< -> $@)"; \
 	only_defines="$$(cat '$<' | sed -E "s/(-D[^ =]+(=(([^\"' ]*)|('[^']*')|(\"[^\"]*\")))?)/\n\1\n/g" | grep '^-D' | paste -sd' ' -)"; \
 	$(SV2V) $(SV2V_ALL_FLAGS) \
 		$${only_defines} \
-		--top '$(call top_module_name_from_src)' \
-		$$(cat '$(lastword $^)') > $@;
+		--top "$${top_module_name}" \
+		$$(cat "$${deps_file}") > $@;
 
 
 
@@ -290,7 +320,7 @@ $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).log: $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAK
 .PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT) $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(ARGS_EXT)
 $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(TB_EXT).$(ARGS_EXT) $(SRC_DIR)/%.$(TB_SRC_EXT)
 	@set -e; \
-	echo "[DEPENDS ] Creating Testbench Makefile Dependencies and Arguments ($< -> $@)"; \
+	echo "[DEPENDS ] $(call top_module_name_from_src): Creating Testbench Makefile dependencies and arguments ($< -> $@)"; \
 	mkdir -p '$(dir $@)'; \
 	seq $$(wc -l < $<) | xargs -I ^ '$(BASH)' -c "head -n ^ '$<' | tail -n 1 > '$(@:%.$(MAKE_DEPS_EXT)=%.^.$(ARGS_EXT))'"; \
 	seq $$(wc -l < $<) | xargs -I ^ echo "$(@:%.$(MAKE_DEPS_EXT)=%.log) : $(@:%.$(MAKE_DEPS_EXT)=%.^.log)" > '$@'; \
@@ -298,7 +328,7 @@ $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(TB_EXT).$(AR
 
 $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(TB_SRC_EXT)
 	@set -e; \
-	echo "[DEPENDS ] Creating Testbench Makefile Dependencies and Arguments ($< -> $@)"; \
+	echo "[DEPENDS ] $(call top_module_name_from_src): Creating Testbench Makefile dependencies and arguments ($< -> $@)"; \
 	mkdir -p '$(dir $@)'; \
 	echo "" > '$(@:%.$(MAKE_DEPS_EXT)=%.1.$(ARGS_EXT))'; \
 	echo "$(@:%.$(MAKE_DEPS_EXT)=%.log) : $(@:%.$(MAKE_DEPS_EXT)=%.1.log)" > '$@'; \
@@ -309,7 +339,7 @@ $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(TB_SRC_EXT)
 $(OUT_TESTBENCHES_DIR)/%.log : $(OUT_TESTBENCHES_DIR)/%.$(OBJ_VVP_EXT)
 	# TODO: top_module_name_from_src is not what we want here...
 	@set -e; \
-	echo '[TB RUN  ] Running $(top_module_name_from_src) ($< -> $@)'; \
+	echo '[TB RUN  ] $(top_module_name_from_src): Running ($< -> $@)'; \
 	($(VVP) $(VVP_TB_FLAGS) '$<' 2>&1 | tee '$@') || echo "[TB FAIL ] Exit code $?, see $@ for details";
 
 %.$(OBJ_VVP_EXT) : %.$(OBJ_EXT) %.$(ARGS_EXT)
