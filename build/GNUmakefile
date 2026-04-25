@@ -3,6 +3,7 @@ OUT_DIR := out
 OUT_OBJ_DIR := $(OUT_DIR)/obj
 OUT_TESTBENCHES_DIR := $(OUT_DIR)/testbenches
 OUT_VERIFICATION_DIR := $(OUT_DIR)/verification
+OUT_TOP_DIR := $(OUT_DIR)/top
 OUT_DOC_DIR := $(OUT_DIR)/doc
 
 SHELL := bash

@@ -18,24 +18,26 @@ jobs:
 
       - name: Install Tools
         run: |
-          sudo apt-get -q -y update &&
-          sudo apt-get -q -y install fpga-icestorm iverilog nextpnr-ice40 yosys yosys-abc &&
+          set -e;
+          sudo apt-get -q -y update;
+          sudo apt-get -q -y install fpga-icestorm git haskell-stack iverilog nextpnr-ice40 yosys yosys-abc;
           npm install -g --ignore-scripts wavedrom;
+          mkdir -p tools && pushd tools;
+          git clone https://github.com/zachjs/sv2v.git;
+          pushd sv2v && make && popd;
+          popd;
 
       - name: Test and Synthesise
         run: |
-          cd "${GITHUB_WORKSPACE}/build" && \
-          ./test.sh && \
-          ./verify.sh && \
-          ./synthesise.sh;
+          set -e;
+          SV2V=tools/svc2v/bin/sv2v;
+          pushd "${GITHUB_WORKSPACE}/build";
+          make all SV2V=${SV2V};
+          popd;
 
       - uses: actions/upload-artifact@v6
         with:
           name: piclike-out
           if-no-files-found: error
           path: |
-            ${{github.workspace}}/build/out/tests/passed
-            ${{github.workspace}}/build/out/tests/failed
-            ${{github.workspace}}/build/out/proofs/passed
-            ${{github.workspace}}/build/out/proofs/failed
-            ${{github.workspace}}/build/out/synthesis
+            ${{github.workspace}}/build/out
