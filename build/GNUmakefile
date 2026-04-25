@@ -91,6 +91,8 @@ DOC_WAVEDROM_OBJ := $(call doc_to_obj,$(DOC_WAVEDROM_SRC),$(DOC_WAVEDROM_SRC_EXT
 
 .PHONY: all bits clean help
 
+.DEFAULT: help
+
 help:
 	@echo 'The following Makefile targets are available:';
 	@echo '    all            Testbenches, proofs, synth, pnr, bits and docs';
@@ -241,7 +243,8 @@ $(foreach i,$(all_possible_args), \
 )
 
 basename_dot_suffix = $(call _basename_dot_suffix,$(1),$(all_possible_args))
-_basename_dot_suffix = $(let head tail,$(2), \
+_basename_dot_suffix = ci_test_$(1)_$(2)
+__basename_dot_suffix = $(let head tail,$(2), \
 	$(call _remove_dot_$(head)_suffix, \
 		$(if $(tail), \
 			$(call _basename_dot_suffix,$(1),$(tail)), \
@@ -316,7 +319,6 @@ $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(TB_EXT).$(AR
 	seq $${num_args} | xargs -I ^ '$(SHELL)' -c "head -n ^ '$<' | tail -n 1 > '$(@:%.$(MAKE_DEPS_EXT)=%.^.$(ARGS_EXT))'"; \
 	seq $${num_args} | xargs -I ^ echo '$(@:%.$(MAKE_DEPS_EXT)=%.$(PASS_EXT)) : $(@:%.$(MAKE_DEPS_EXT)=%.^.$(PASS_EXT))' > '$@'; \
 	seq $${num_args} | xargs -I ^ echo '$(@:%.$(MAKE_DEPS_EXT)=%.^.$(ARGS_EXT)) : $@' >> '$@';
-	$(eval $(file < $@))
 
 $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(TB_SRC_EXT)
 	@set -e; \
@@ -326,6 +328,7 @@ $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(TB_SRC_EXT)
 	echo '$(@:%.$(MAKE_DEPS_EXT)=%.$(PASS_EXT)) : $(@:%.$(MAKE_DEPS_EXT)=%.1.$(PASS_EXT))' > '$@'; \
 	echo '$(@:%.$(MAKE_DEPS_EXT)=%.1.$(ARGS_EXT)) : $@' >> '$@';
 
+# TODO: a 'make help' or 'make clean' will run the rule to include these, even if we're not building anything; we rely on this behaviour for testbenches, but for everything else it should be a conditional include (but how ?)
 include $(patsubst $(SRC_DIR)/%.$(TB_SRC_EXT),$(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT),$(call find_src,*.$(TB_SRC_EXT)))
 
 .PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.$(PASS_EXT) $(OUT_TESTBENCHES_DIR)/%.$(FAIL_EXT)

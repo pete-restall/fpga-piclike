@@ -22,7 +22,7 @@ jobs:
           sudo apt-get -q -y update;
           sudo apt-get -q -y install fpga-icestorm git haskell-stack iverilog nextpnr-ice40 yosys yosys-abc;
           npm install -g --ignore-scripts wavedrom;
-          mkdir -p tools && pushd tools;
+          mkdir -p "${GITHUB_WORKSPACE}/build/tools" && pushd "${GITHUB_WORKSPACE}/build/tools";
           git clone https://github.com/zachjs/sv2v.git;
           pushd sv2v && make && popd;
           popd;
@@ -30,9 +30,9 @@ jobs:
       - name: Test and Synthesise
         run: |
           set -e;
-          SV2V=tools/svc2v/bin/sv2v;
+          SV2V="${GITHUB_WORKSPACE}/build/tools/svc2v/bin/sv2v";
           pushd "${GITHUB_WORKSPACE}/build";
-          make all SV2V=${SV2V};
+          make all "SV2V=${SV2V}";
           popd;
 
       - uses: actions/upload-artifact@v6
