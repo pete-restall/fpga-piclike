@@ -325,6 +325,8 @@ $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(TB_SRC_EXT)
 	echo '$(@:%.$(MAKE_DEPS_EXT)=%.$(PASS_EXT)) : $(@:%.$(MAKE_DEPS_EXT)=%.1.$(PASS_EXT))' > '$@'; \
 	echo '$(@:%.$(MAKE_DEPS_EXT)=%.1.$(ARGS_EXT)) : $@' >> '$@';
 
+include $(patsubst $(SRC_DIR)/%.$(TB_SRC_EXT),$(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT),$(call find_src,*.$(TB_SRC_EXT)))
+
 .PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.$(PASS_EXT) $(OUT_TESTBENCHES_DIR)/%.$(FAIL_EXT)
 $(OUT_TESTBENCHES_DIR)/%.$(PASS_EXT): $(OUT_TESTBENCHES_DIR)/%.$(LOG_EXT)
 	@set -e; \
@@ -355,5 +357,3 @@ $(OUT_TESTBENCHES_DIR)/%.$(LOG_EXT): $(OUT_TESTBENCHES_DIR)/%.$(OBJ_VVP_EXT)
 		-o '$@' \
 		-s "$${top_module_name}" \
 		'$<';
-
--include $(call find_files,$(OUT_OBJ_DIR),*.$(MAKE_DEPS_EXT))
