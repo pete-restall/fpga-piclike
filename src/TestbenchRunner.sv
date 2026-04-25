@@ -75,7 +75,7 @@ module TestbenchRunner #(
 	task on_all_tests_run;
 		all_tests_run = 1;
 		$display(
-			"[BENCH   ] %0d tests run; %0d passed, %0d failed",
+			"[OUTCOME ] %0d tests run; %0d passed, %0d failed",
 			test_runner.number_of_tests,
 			(test_runner.number_of_tests - test_runner.number_of_failed_tests),
 			test_runner.number_of_failed_tests);
