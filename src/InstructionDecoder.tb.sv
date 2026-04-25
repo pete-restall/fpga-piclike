@@ -38,7 +38,7 @@ module InstructionDecoderTestbench #(
 	task addwf__d_bit_is_0__expect_is_destination_w_true;
 		integer w;
 		for (w = 0; w < instructions.NUMBER_OF_W; w += 1) begin
-			@(posedge clock) dut_bus = instructions.addwf(w, any_f(), instructions.W);
+//			@(posedge clock) dut_bus = instructions.addwf(w, any_f(), instructions.Dbits.W);
 			@(posedge clock) `ASSERT(dut_is_destination_w);
 		end
 	endtask
@@ -50,7 +50,7 @@ module InstructionDecoderTestbench #(
 	task addwf__d_bit_is_1__expect_is_destination_w_false;
 		integer w;
 		for (w = 0; w < instructions.NUMBER_OF_W; w += 1) begin
-			@(posedge clock) dut_bus = instructions.addwf(w, any_f(), instructions.F);
+//			@(posedge clock) dut_bus = instructions.addwf(w, any_f(), instructions.Dbits.F);
 			@(posedge clock) `ASSERT(!dut_is_destination_w);
 		end
 	endtask

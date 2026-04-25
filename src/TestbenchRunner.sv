@@ -1,8 +1,9 @@
 `default_nettype none
 `timescale 1ns/100ps
 
+`define STRINGIFY(x) `"`x`"
+
 module TestbenchRunner #(
-	parameter string VCD_FILENAME = "dump.vcd",
 	parameter integer TIMEOUT_CLOCKS = 1024
 )(
 	output bit sync_reset,
@@ -20,10 +21,10 @@ module TestbenchRunner #(
 		number_of_tests = 0;
 		number_of_failed_tests = 0;
 
-		if (VCD_FILENAME != "") begin
-			$dumpfile(VCD_FILENAME);
+		`ifdef _DUMP_FILENAME
+			$dumpfile(`STRINGIFY(_DUMP_FILENAME));
 			$dumpvars(0);
-		end
+		`endif
 	end
 
 	initial clock_stimuli(TIMEOUT_CLOCKS, 10ns);
@@ -42,14 +43,14 @@ module TestbenchRunner #(
 	task fail_if(bit has_failed, string reason);
 		if (has_failed) begin
 			$display("Failing because ", reason);
-			$finish(1);
+			$finish_and_return(1);
 		end
 	endtask
 
 	task on_next_test(string name);
 		test_name = name;
 		number_of_tests += 1;
-		$display("[TEST] %3d => %s", number_of_tests, test_name);
+		$display("[TEST    ] %3d => %s", number_of_tests, test_name);
 		reset();
 	endtask
 
@@ -61,11 +62,11 @@ module TestbenchRunner #(
 	endtask
 
 	task on_test_passed;
-		$display("[PASSED] ", test_name);
+		$display("[PASSED  ] ", test_name);
 	endtask
 
 	task on_test_failed;
 		number_of_failed_tests += 1;
-		$display("[FAILED] ", test_name);
+		$display("[FAILED  ] ", test_name);
 	endtask
 endmodule

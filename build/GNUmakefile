@@ -5,7 +5,7 @@ OUT_TESTBENCHES_DIR := $(OUT_DIR)/testbenches
 OUT_VERIFICATION_DIR := $(OUT_DIR)/verification
 OUT_DOC_DIR := $(OUT_DIR)/doc
 
-BASH := bash
+SHELL := bash
 NULL_FD := /dev/null
 
 SRC_EXT := sv
@@ -45,11 +45,13 @@ TOP_MODULE_SUFFIX :=
 IVERILOG := iverilog
 IVERILOG_ALL_FLAGS := -g2012
 IVERILOG_DEPS_FLAGS := $(IVERILOG_ALL_FLAGS) -Y.$(SRC_EXT) -Y.$(IF_SRC_EXT) -i
-IVERILOG_TB_FLAGS := $(IVERILOG_ALL_FLAGS)
+IVERILOG_VVP_FLAGS := $(IVERILOG_ALL_FLAGS)
 
 VVP := vvp
 VVP_ALL_FLAGS :=
 VVP_TB_FLAGS := $(VVP_ALL_FLAGS)
+VVP_TB_EXTFLAGS := -lxt2-speed
+VVP_DUMP_EXT := lxt2
 
 SV2V := sv2v
 SV2V_ALL_FLAGS := --siloed
@@ -60,16 +62,16 @@ SV2V_TB_FLAGS := $(SV2V_ALL_FLAGS)
 find_src = $(call find_files,$(SRC_DIR),$(1))
 find_files = $(shell find '$(1)' -type f -name '$(2)' 2>$(NULL_FD))
 src_to_obj = $(patsubst $(SRC_DIR)/%,$(OUT_OBJ_DIR)/%,$(1:%.$(2)=%.$(3)))
-src_to_testbench_logs = $(patsubst $(SRC_DIR)/%,$(OUT_TESTBENCHES_DIR)/%,$(1:%.$(SRC_EXT)=%.log))
-src_to_verification_logs = $(patsubst $(SRC_DIR)/%,$(OUT_VERIFICATION_DIR)/%,$(1:%.$(SRC_EXT)=%.log))
+src_to_testbench_passes = $(patsubst $(SRC_DIR)/%,$(OUT_TESTBENCHES_DIR)/%,$(1:%.$(SRC_EXT)=%.pass))
+src_to_verification_passes = $(patsubst $(SRC_DIR)/%,$(OUT_VERIFICATION_DIR)/%,$(1:%.$(SRC_EXT)=%.pass))
 doc_to_obj = $(patsubst $(SRC_DIR)/%,$(DOC_OBJ_DIR)/%,$(1:%.$(2)=%.$(3)))
 
 TB_SRC := $(call find_src,*.$(TB_SRC_EXT))
-TB_LOGS := $(call src_to_testbench_logs,$(TB_SRC))
+TB_ALL_PASSED := $(call src_to_testbench_passes,$(TB_SRC))
 
 FV_SRC := $(call find_src,*.$(FV_SRC_EXT))
 FV_SBY_OBJ := $(call src_to_obj,$(FV_SRC),$(FV_SRC_EXT),$(OBJ_SBY_EXT))
-FV_LOGS := $(call src_to_verification_logs,$(FV_SRC))
+FV_ALL_PROVED := $(call src_to_verification_passes,$(FV_SRC))
 
 TOP_SRC := $(call find_src,*.$(TOP_SRC_EXT))
 TOP_OBJ := $(call src_to_obj,$(TOP_SRC),$(SRC_EXT),$(OBJ_EXT))
@@ -99,9 +101,13 @@ help:
 
 all: testbenches proofs synth pnr bits docs
 
-testbenches: $(TB_LOGS)
+testbenches: $(TB_ALL_PASSED)
+	$(foreach pass,$<, \
+		@set -e; \
+		[ -f '$(pass)' ] || (echo '*** Not all testbenches passed; fix the failing ones and re-run "make testbenches".' && exit 1); \
+	)
 
-proofs: $(FV_LOGS)
+proofs: # $(FV_ALL_PROVED)
 
 synth: $(TOP_OBJ)
 	@echo '[SYNTH   ] TODO: RUN SYNTHESIS FOR $<';
@@ -118,13 +124,6 @@ docs: $(DOC_MD_OBJ) $(DOC_WAVEDROM_OBJ)
 clean:
 	@echo '[CLEAN   ] Cleaning up';
 	rm -rf '$(OUT_DIR)';
-
-.PHONY: blah
-blah: ################### TODO: REMOVE THIS - TESTING PURPOSES ONLY !
-	@echo $(call basename_dot_suffix,some_file.tb.ext)
-	@echo $(call top_module_name_from,some_file.tb.ext)
-	@echo $(call basename_dot_suffix,some_file.tb.4.ext)
-	@echo $(call top_module_name_from,some_file.tb.4.ext)
 
 prefixed_src_dirs_from_src = $(call prefixed_src_dirs_from,$(1),$<)
 prefixed_src_dirs_from = $(call prefixed_parent_dirs,$(1),$(SRC_DIR),$(2))
@@ -242,13 +241,22 @@ $(OUT_DOC_DIR)/%.$(DOC_WAVEDROM_OBJ_EXT).svg: $(SRC_DIR)/%.$(DOC_WAVEDROM_SRC_EX
 all_possible_args := $(shell seq $(MAX_ARGS))
 
 define DEFINE_PARAMETERISED_TOP_RECIPES
+.PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.$(i).$(IVERILOG_DEPS_EXT)
 $(OUT_TESTBENCHES_DIR)/%.$(i).$(IVERILOG_DEPS_EXT): $(SRC_DIR)/%.$(SRC_EXT) $(OUT_TESTBENCHES_DIR)/%.$(i).$(ARGS_EXT)
 	@set -e; \
 	top_module_name='$$(call top_module_name_from_src)'; \
 	args_file='$$(lastword $$^)'; \
 	echo "[DEPENDS ] $$$${top_module_name}: Discovering dependencies ($$$${args_file} -> $$@)"; \
 	mkdir -p '$$(dir $$@)'; \
-	$$(IVERILOG) $$(IVERILOG_DEPS_FLAGS) $$(call prefixed_src_dirs_from_src,-I) $$(call prefixed_src_dirs_from_src,-y) $$$$(cat "$$$${args_file}") -o '$(NULL_FD)' '-Mprefix=$$@' -s "$$$${top_module_name}" '$$<';
+	$$(IVERILOG) $$(IVERILOG_DEPS_FLAGS) \
+		'-D_DUMP_FILENAME=$(NULL_FD)' \
+		$$(call prefixed_src_dirs_from_src,-I) \
+		$$(call prefixed_src_dirs_from_src,-y) \
+		$$$$(cat "$$$${args_file}") \
+		-o '$(NULL_FD)' \
+		'-Mprefix=$$@' \
+		-s "$$$${top_module_name}" \
+		'$$<';
 
 # TODO: OUT_VERIFICATION_DIR and OUT_TOPMODULES_DIR
 
@@ -291,6 +299,7 @@ _basename_dot_suffix = $(let head tail,$(2), \
 	echo '[DEPENDS ] $(call top_module_name_from_src): Converting dependencies ($< -> $@)'; \
 	cp '$<' '$@';
 
+.PRECIOUS: %.$(OBJ_EXT)
 %.$(OBJ_EXT): %.$(ARGS_EXT) %.$(SV2V_DEPS_EXT)
 	@set -e; \
 	top_module_name='$(call top_module_name_from_src)'; \
@@ -298,6 +307,7 @@ _basename_dot_suffix = $(let head tail,$(2), \
 	echo "[SV2V    ] $${top_module_name}: Transpiling ($< -> $@)"; \
 	only_defines="$$(cat '$<' | sed -E "s/(-D[^ =]+(=(([^\"' ]*)|('[^']*')|(\"[^\"]*\")))?)/\n\1\n/g" | grep '^-D' | paste -sd' ' -)"; \
 	$(SV2V) $(SV2V_ALL_FLAGS) \
+		'-D_DUMP_FILENAME=$(notdir $(@:%.$(OBJ_EXT)=%.$(VVP_DUMP_EXT)))' \
 		$${only_defines} \
 		--top "$${top_module_name}" \
 		$$(cat "$${deps_file}") > $@;
@@ -308,42 +318,76 @@ _basename_dot_suffix = $(let head tail,$(2), \
 
 
 # thrash out the call hierarchy that the testbenches recipe needs; build X.log from X.*.deps (run vvp for each), build X.N.deps from each line in X.args (iverilog -Mprefix), build X.N.vvp from X.N.v, build X.N.v from X.N.deps (sv2v)
+.PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).pass $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).fail
+$(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).pass: $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).log
+	@set -e; \
+	echo '[LOG SCAN] $(top_module_name_from_src): Scanning logs for testbench results ($< > $@)'; \
+	num_failed=$$((0 + $$(ls -l $(<:%.log=%.*.fail) 2>$(NULL_FD) | wc -l))); \
+	num_passed=$$((0 + $$(ls -l $(<:%.log=%.*.pass) 2>$(NULL_FD) | wc -l))); \
+	if [ $${num_failed} -eq 0 ]; then \
+		rm -f '$(@:%.pass=%.fail)' 2> '$(NULL_FD)'; \
+		echo "[TB PASS ] $(call top_module_name_from_src): $${num_passed} runs passed, 0 failed"; \
+		touch '$@'; \
+	else \
+		rm -f '$@' 2> '$(NULL_FD)'; \
+		echo "[TB FAIL ] $(call top_module_name_from_src): $${num_passed} runs passed, $${num_failed} failed"; \
+		touch '$(@:%.pass=%.fail)'; \
+	fi
 
 .PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).log
-$(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).log: $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT) out/testbenches/InstructionDecoder.tb.1.log out/testbenches/InstructionDecoder.tb.2.log
-	@echo "ALL INPUTS: $^";
+$(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).log: $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT)
 	@set -e; \
-	mkdir -p '$(dir $@)'; \
-	(cat '$(@:%.log=%.*.log)' > '$@') || echo "TODO: TEMPORARY IGNORE ERROR"; \
-	grep '\[TB FAIL \]' '$@' || echo '[TB PASS ] $(call top_module_name_from_src)';
+	echo '[LOG CAT ] $(top_module_name_from_src): Concatenating logs ($(@:%.log=%.*.log) > $@)'; \
+	(cat $(@:%.log=%.*.log) > '$@');
 
 .PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT) $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(ARGS_EXT)
 $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(TB_EXT).$(ARGS_EXT) $(SRC_DIR)/%.$(TB_SRC_EXT)
 	@set -e; \
-	echo "[DEPENDS ] $(call top_module_name_from_src): Creating Testbench Makefile dependencies and arguments ($< -> $@)"; \
+	echo '[DEPENDS ] $(call top_module_name_from_src): Creating Testbench Makefile dependencies and arguments ($< -> $@)'; \
 	mkdir -p '$(dir $@)'; \
-	seq $$(wc -l < $<) | xargs -I ^ '$(BASH)' -c "head -n ^ '$<' | tail -n 1 > '$(@:%.$(MAKE_DEPS_EXT)=%.^.$(ARGS_EXT))'"; \
-	seq $$(wc -l < $<) | xargs -I ^ echo "$(@:%.$(MAKE_DEPS_EXT)=%.log) : $(@:%.$(MAKE_DEPS_EXT)=%.^.log)" > '$@'; \
-	seq $$(wc -l < $<) | xargs -I ^ echo "$(@:%.$(MAKE_DEPS_EXT)=%.^.$(ARGS_EXT)) : $@" >> '$@';
+	seq $$(wc -l < $<) | xargs -I ^ '$(SHELL)' -c "head -n ^ '$<' | tail -n 1 > '$(@:%.$(MAKE_DEPS_EXT)=%.^.$(ARGS_EXT))'"; \
+	seq $$(wc -l < $<) | xargs -I ^ echo '$(@:%.$(MAKE_DEPS_EXT)=%.pass) : $(@:%.$(MAKE_DEPS_EXT)=%.^.pass)' > '$@'; \
+	seq $$(wc -l < $<) | xargs -I ^ echo '$(@:%.$(MAKE_DEPS_EXT)=%.^.$(ARGS_EXT)) : $@' >> '$@';
 
 $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(TB_SRC_EXT)
 	@set -e; \
-	echo "[DEPENDS ] $(call top_module_name_from_src): Creating Testbench Makefile dependencies and arguments ($< -> $@)"; \
+	echo '[DEPENDS ] $(call top_module_name_from_src): Creating Testbench Makefile dependencies and arguments ($< -> $@)'; \
 	mkdir -p '$(dir $@)'; \
-	echo "" > '$(@:%.$(MAKE_DEPS_EXT)=%.1.$(ARGS_EXT))'; \
-	echo "$(@:%.$(MAKE_DEPS_EXT)=%.log) : $(@:%.$(MAKE_DEPS_EXT)=%.1.log)" > '$@'; \
-	echo "$(@:%.$(MAKE_DEPS_EXT)=%.1.$(ARGS_EXT)) : $@" >> '$@';
+	echo '' > '$(@:%.$(MAKE_DEPS_EXT)=%.1.$(ARGS_EXT))'; \
+	echo '$(@:%.$(MAKE_DEPS_EXT)=%.pass) : $(@:%.$(MAKE_DEPS_EXT)=%.1.pass)' > '$@'; \
+	echo '$(@:%.$(MAKE_DEPS_EXT)=%.1.$(ARGS_EXT)) : $@' >> '$@';
 
 #-include $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT)
 
-$(OUT_TESTBENCHES_DIR)/%.log : $(OUT_TESTBENCHES_DIR)/%.$(OBJ_VVP_EXT)
-	# TODO: top_module_name_from_src is not what we want here...
+.PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.pass $(OUT_TESTBENCHES_DIR)/%.fail
+$(OUT_TESTBENCHES_DIR)/%.pass: $(OUT_TESTBENCHES_DIR)/%.log
 	@set -e; \
-	echo '[TB RUN  ] $(top_module_name_from_src): Running ($< -> $@)'; \
-	($(VVP) $(VVP_TB_FLAGS) '$<' 2>&1 | tee '$@') || echo "[TB FAIL ] Exit code $?, see $@ for details";
+	rm -f '$(@:%.pass=%.fail)' 2> '$(NULL_FD)'; \
+	grep '\[TB FAIL \]' '$<' 2>&1 > '$(NULL_FD)' || touch '$@'; \
+	[ -f '$@' ] || touch '$(@:%.pass=%.fail)';
 
-%.$(OBJ_VVP_EXT) : %.$(OBJ_EXT) %.$(ARGS_EXT)
-	echo "TODO: run iverilog here, using '$<' for source and '$(lastword $^)' for arguments, with -o '$@'";
-	touch '$@'
+.PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.log
+$(OUT_TESTBENCHES_DIR)/%.log: $(OUT_TESTBENCHES_DIR)/%.$(OBJ_VVP_EXT)
+	@set -e; \
+	echo '[SIMULATE] $(top_module_name_from_src): Simulating ($< -> $@)'; \
+	absolute_input_file=$$(readlink -f '$<'); \
+	pushd '$(dir $@)'; \
+	($(VVP) $(VVP_TB_FLAGS) "$${absolute_input_file}" $(VVP_TB_EXTFLAGS) || echo "[TB FAIL ] Exit code $$?, see $@ for details") 2>&1 | tee '$(notdir $@)'; \
+	popd;
+
+.PRECIOUS: %.$(OBJ_VVP_EXT)
+%.$(OBJ_VVP_EXT): %.$(OBJ_EXT) %.$(ARGS_EXT)
+	@set -e; \
+	top_module_name='$(call top_module_name_from_src)'; \
+	args_file='$(lastword $^)'; \
+	echo "[IVERILOG] $${top_module_name}: Compiling simulation ($${args_file} -> $@)"; \
+	mkdir -p '$(dir $@)'; \
+	$(IVERILOG) $(IVERILOG_VVP_FLAGS) \
+		$(call prefixed_src_dirs_from_src,-I) \
+		$(call prefixed_src_dirs_from_src,-y) \
+		$$(cat "$${args_file}") \
+		-o '$@' \
+		-s "$${top_module_name}" \
+		'$<';
 
 -include out/testbenches/InstructionDecoder.tb.mdeps # $(call find_files,$(OUT_OBJ_DIR),*.$(MAKE_DEPS_EXT))
