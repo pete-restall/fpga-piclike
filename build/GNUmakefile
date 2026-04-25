@@ -38,6 +38,10 @@ FILE_DEPS_EXT := fdeps
 MAKE_DEPS_EXT := mdeps
 SV2V_DEPS_EXT := sdeps
 
+LOG_EXT := log
+PASS_EXT := pass
+FAIL_EXT := fail
+
 TB_MODULE_SUFFIX := Testbench
 FV_MODULE_SUFFIX := Verification
 TOP_MODULE_SUFFIX :=
@@ -62,8 +66,8 @@ SV2V_TB_FLAGS := $(SV2V_ALL_FLAGS)
 find_src = $(call find_files,$(SRC_DIR),$(1))
 find_files = $(shell find '$(1)' -type f -name '$(2)' 2>$(NULL_FD))
 src_to_obj = $(patsubst $(SRC_DIR)/%,$(OUT_OBJ_DIR)/%,$(1:%.$(2)=%.$(3)))
-src_to_testbench_passes = $(patsubst $(SRC_DIR)/%,$(OUT_TESTBENCHES_DIR)/%,$(1:%.$(SRC_EXT)=%.pass))
-src_to_verification_passes = $(patsubst $(SRC_DIR)/%,$(OUT_VERIFICATION_DIR)/%,$(1:%.$(SRC_EXT)=%.pass))
+src_to_testbench_passes = $(patsubst $(SRC_DIR)/%,$(OUT_TESTBENCHES_DIR)/%,$(1:%.$(SRC_EXT)=%.$(PASS_EXT)))
+src_to_verification_passes = $(patsubst $(SRC_DIR)/%,$(OUT_VERIFICATION_DIR)/%,$(1:%.$(SRC_EXT)=%.$(PASS_EXT)))
 doc_to_obj = $(patsubst $(SRC_DIR)/%,$(DOC_OBJ_DIR)/%,$(1:%.$(2)=%.$(3)))
 
 TB_SRC := $(call find_src,*.$(TB_SRC_EXT))
@@ -84,7 +88,7 @@ DOC_MD_OBJ := $(call doc_to_obj,$(DOC_MD_SRC),$(DOC_MD_SRC_EXT),$(DOC_MD_OBJ_EXT
 DOC_WAVEDROM_SRC := $(call find_src,*.$(DOC_WAVEDROM_SRC_EXT))
 DOC_WAVEDROM_OBJ := $(call doc_to_obj,$(DOC_WAVEDROM_SRC),$(DOC_WAVEDROM_SRC_EXT),$(DOC_WAVEDROM_OBJ_EXT))
 
-.PHONY: bits clean docs help pnr
+.PHONY: all bits clean help
 
 help:
 	@echo 'The following Makefile targets are available:';
@@ -104,7 +108,7 @@ all: testbenches proofs synth pnr bits docs
 testbenches: $(TB_ALL_PASSED)
 	$(foreach pass,$<, \
 		@set -e; \
-		[ -f '$(pass)' ] || (echo '*** Not all testbenches passed; fix the failing ones and re-run "make testbenches".' && exit 1); \
+		[ -f '$(pass)' ] || (echo && echo '*** Not all testbenches passed; fix the failing ones and re-run "make testbenches".' && echo && exit 1); \
 	)
 
 proofs: # $(FV_ALL_PROVED)
@@ -136,38 +140,6 @@ top_module_name_from = $(notdir \
 	$(patsubst %.$(TB_EXT),%$(TB_MODULE_SUFFIX), \
 	$(call basename_dot_suffix,$(1))))) \
 )
-
-#$(OUT_OBJ_DIR)/%.$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(SRC_EXT)
-#	@set -e; \
-#	echo '[DEPS  ] $(top_module_name_from_src) ($< -> $@)'; \
-#	mkdir -p '$(dir $@)'; \
-#	$(IVERILOG) $(IVERILOG_DEPS_FLAGS) $(call prefixed_src_dirs,-I) $(call prefixed_src_dirs,-y) -o '$(NULL_FD)' '-Mprefix=$@.iv' -s '$(top_module_name_from_src)' '$<'; \
-#	echo "$(@:%.$(DEPS_EXT)=%.$(OBJ_EXT)) $@ : $$(cat '$@.iv' | sed -E 's/^[IM] (.+)$$/\1/' | sort | uniq | paste -sd' ' -)" > '$@';
-#
-#.PRECIOUS: $(OUT_OBJ_DIR)/%.$(MAKE_DEPS_EXT)
-#-include $(DEPS)
-
-#$(OUT_TESTBENCHES_DIR)/%/testbench.$(DEPS_EXT): $(wildcard $(SRC_DIR)/%.args)
-#	@set -e; \
-#	echo '[TBENCH] Generating testbench arguments for $(call top_module_name_from,$(<:%.args=%.$(SRC_EXT))) ($< -> $@)'; \
-#	seq $$(wc -l < '$<') | xargs -I ^ echo "$@ : $(@:%.$(DEPS_EXT)=%.^.$(OBJ_VVP_EXT))";
-#
-#.PRECIOUS: $(OUT_TESTBENCHES_DIR)/%/testbench.$(DEPS_EXT)
-#-include $(TB_DEPS)
-
-#$(OUT_TESTBENCHES_DIR)/%.$(OBJ_VVP_EXT):
-#	# TODO: run the vvp - need to figure out how to parameterise the runs (there is one VVP per parameter set...)
-#	@set -e; \
-#	echo '[TBENCH] Running $(top_module_name_from_src) ($< -> $@)'; \
-#	pushd '$@'; \
-#	$(VVP) $(VVP_TB_FLAGS) '$<';
-
-#$(OUT_TESTBENCHES_DIR)/%/testbench.*.$(OBJ_VVP_EXT): $(OUT_OBJ_DIR)/%.$(OBJ_EXT)
-#	# TODO: how to compile one VVP for each set of parameters ?
-#	@set -e; \
-#	echo '[TBENCH] Compiling $(top_module_name_from_src) ($< -> $@)'; \
-#	mkdir -p '$(dir $@)'; \
-#	$(IVERILOG) $(IVERILOG_TB_FLAGS) -o '$@' -s "${testbench_module_name}" ${args} '$<';
 
 define _script_create_target_sby =
 	@cat > '$@' <<-EOF
@@ -312,33 +284,27 @@ _basename_dot_suffix = $(let head tail,$(2), \
 		--top "$${top_module_name}" \
 		$$(cat "$${deps_file}") > $@;
 
-
-
-
-
-
-# thrash out the call hierarchy that the testbenches recipe needs; build X.log from X.*.deps (run vvp for each), build X.N.deps from each line in X.args (iverilog -Mprefix), build X.N.vvp from X.N.v, build X.N.v from X.N.deps (sv2v)
-.PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).pass $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).fail
-$(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).pass: $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).log
+.PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(PASS_EXT) $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(FAIL_EXT)
+$(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(PASS_EXT): $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(LOG_EXT)
 	@set -e; \
 	echo '[LOG SCAN] $(top_module_name_from_src): Scanning logs for testbench results ($< > $@)'; \
-	num_failed=$$((0 + $$(ls -l $(<:%.log=%.*.fail) 2>$(NULL_FD) | wc -l))); \
-	num_passed=$$((0 + $$(ls -l $(<:%.log=%.*.pass) 2>$(NULL_FD) | wc -l))); \
+	num_failed=$$((0 + $$(ls -l $(<:%.$(LOG_EXT)=%.*.$(FAIL_EXT)) 2>$(NULL_FD) | wc -l))); \
+	num_passed=$$((0 + $$(ls -l $(<:%.$(LOG_EXT)=%.*.$(PASS_EXT)) 2>$(NULL_FD) | wc -l))); \
 	if [ $${num_failed} -eq 0 ]; then \
-		rm -f '$(@:%.pass=%.fail)' 2> '$(NULL_FD)'; \
+		rm -f '$(@:%.$(PASS_EXT)=%.$(FAIL_EXT))' 2> '$(NULL_FD)'; \
 		echo "[TB PASS ] $(call top_module_name_from_src): $${num_passed} runs passed, 0 failed"; \
 		touch '$@'; \
 	else \
 		rm -f '$@' 2> '$(NULL_FD)'; \
 		echo "[TB FAIL ] $(call top_module_name_from_src): $${num_passed} runs passed, $${num_failed} failed"; \
-		touch '$(@:%.pass=%.fail)'; \
+		touch '$(@:%.$(PASS_EXT)=%.$(FAIL_EXT))'; \
 	fi
 
-.PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).log
-$(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).log: $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT)
+.PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(LOG_EXT)
+$(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(LOG_EXT): $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT)
 	@set -e; \
-	echo '[LOG CAT ] $(top_module_name_from_src): Concatenating logs ($(@:%.log=%.*.log) > $@)'; \
-	(cat $(@:%.log=%.*.log) > '$@');
+	echo '[LOG CAT ] $(top_module_name_from_src): Concatenating logs ($(@:%.$(LOG_EXT)=%.*.$(LOG_EXT)) > $@)'; \
+	(cat $(@:%.$(LOG_EXT)=%.*.$(LOG_EXT)) > '$@');
 
 .PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT) $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(ARGS_EXT)
 $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(TB_EXT).$(ARGS_EXT) $(SRC_DIR)/%.$(TB_SRC_EXT)
@@ -346,7 +312,7 @@ $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(TB_EXT).$(AR
 	echo '[DEPENDS ] $(call top_module_name_from_src): Creating Testbench Makefile dependencies and arguments ($< -> $@)'; \
 	mkdir -p '$(dir $@)'; \
 	seq $$(wc -l < $<) | xargs -I ^ '$(SHELL)' -c "head -n ^ '$<' | tail -n 1 > '$(@:%.$(MAKE_DEPS_EXT)=%.^.$(ARGS_EXT))'"; \
-	seq $$(wc -l < $<) | xargs -I ^ echo '$(@:%.$(MAKE_DEPS_EXT)=%.pass) : $(@:%.$(MAKE_DEPS_EXT)=%.^.pass)' > '$@'; \
+	seq $$(wc -l < $<) | xargs -I ^ echo '$(@:%.$(MAKE_DEPS_EXT)=%.$(PASS_EXT)) : $(@:%.$(MAKE_DEPS_EXT)=%.^.$(PASS_EXT))' > '$@'; \
 	seq $$(wc -l < $<) | xargs -I ^ echo '$(@:%.$(MAKE_DEPS_EXT)=%.^.$(ARGS_EXT)) : $@' >> '$@';
 
 $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(TB_SRC_EXT)
@@ -354,20 +320,20 @@ $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(TB_SRC_EXT)
 	echo '[DEPENDS ] $(call top_module_name_from_src): Creating Testbench Makefile dependencies and arguments ($< -> $@)'; \
 	mkdir -p '$(dir $@)'; \
 	echo '' > '$(@:%.$(MAKE_DEPS_EXT)=%.1.$(ARGS_EXT))'; \
-	echo '$(@:%.$(MAKE_DEPS_EXT)=%.pass) : $(@:%.$(MAKE_DEPS_EXT)=%.1.pass)' > '$@'; \
+	echo '$(@:%.$(MAKE_DEPS_EXT)=%.$(PASS_EXT)) : $(@:%.$(MAKE_DEPS_EXT)=%.1.$(PASS_EXT))' > '$@'; \
 	echo '$(@:%.$(MAKE_DEPS_EXT)=%.1.$(ARGS_EXT)) : $@' >> '$@';
 
 #-include $(OUT_TESTBENCHES_DIR)/%.$(TB_EXT).$(MAKE_DEPS_EXT)
 
-.PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.pass $(OUT_TESTBENCHES_DIR)/%.fail
-$(OUT_TESTBENCHES_DIR)/%.pass: $(OUT_TESTBENCHES_DIR)/%.log
+.PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.$(PASS_EXT) $(OUT_TESTBENCHES_DIR)/%.$(FAIL_EXT)
+$(OUT_TESTBENCHES_DIR)/%.$(PASS_EXT): $(OUT_TESTBENCHES_DIR)/%.$(LOG_EXT)
 	@set -e; \
-	rm -f '$(@:%.pass=%.fail)' 2> '$(NULL_FD)'; \
+	rm -f '$(@:%.$(PASS_EXT)=%.$(FAIL_EXT))' 2> '$(NULL_FD)'; \
 	grep '\[TB FAIL \]' '$<' 2>&1 > '$(NULL_FD)' || touch '$@'; \
-	[ -f '$@' ] || touch '$(@:%.pass=%.fail)';
+	[ -f '$@' ] || touch '$(@:%.$(PASS_EXT)=%.$(FAIL_EXT))';
 
-.PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.log
-$(OUT_TESTBENCHES_DIR)/%.log: $(OUT_TESTBENCHES_DIR)/%.$(OBJ_VVP_EXT)
+.PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.$(LOG_EXT)
+$(OUT_TESTBENCHES_DIR)/%.$(LOG_EXT): $(OUT_TESTBENCHES_DIR)/%.$(OBJ_VVP_EXT)
 	@set -e; \
 	echo '[SIMULATE] $(top_module_name_from_src): Simulating ($< -> $@)'; \
 	absolute_input_file=$$(readlink -f '$<'); \
