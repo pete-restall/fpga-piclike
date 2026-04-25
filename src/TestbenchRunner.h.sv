@@ -22,13 +22,7 @@
 			test_runner.on_test_passed();
 
 `define END_TEST_SUITE \
-		$display( \
-			"[BENCH] %0d tests run; %0d passed, %0d failed", \
-			test_runner.number_of_tests, \
-			(test_runner.number_of_tests - test_runner.number_of_failed_tests), \
-			test_runner.number_of_failed_tests); \
-\
-		$finish_and_return(test_runner.number_of_failed_tests > 0 ? 1 : 0); \
+		test_runner.on_all_tests_run(); \
 	endtask
 
 `define ASSERT(predicate) \

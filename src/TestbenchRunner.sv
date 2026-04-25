@@ -12,6 +12,7 @@ module TestbenchRunner #(
 	string test_name;
 	integer number_of_tests;
 	integer number_of_failed_tests;
+	bit all_tests_run;
 
 	initial begin
 		sync_reset <= 1;
@@ -20,6 +21,7 @@ module TestbenchRunner #(
 		test_name = "<none>";
 		number_of_tests = 0;
 		number_of_failed_tests = 0;
+		all_tests_run = 0;
 
 		`ifdef _DUMP_FILENAME
 			$dumpfile(`STRINGIFY(_DUMP_FILENAME));
@@ -31,7 +33,7 @@ module TestbenchRunner #(
 
 	task clock_stimuli(integer timeout_clocks, time clock_period);
 		integer i;
-		for (i = 0; i < timeout_clocks + 1; i += 1) begin
+		for (i = 0; !all_tests_run && i < timeout_clocks + 1; i += 1) begin
 			clock <= 1;
 			#(clock_period / 2ns);
 			clock <= 0;
@@ -68,5 +70,16 @@ module TestbenchRunner #(
 	task on_test_failed;
 		number_of_failed_tests += 1;
 		$display("[FAILED  ] ", test_name);
+	endtask
+
+	task on_all_tests_run;
+		all_tests_run = 1;
+		$display(
+			"[BENCH   ] %0d tests run; %0d passed, %0d failed",
+			test_runner.number_of_tests,
+			(test_runner.number_of_tests - test_runner.number_of_failed_tests),
+			test_runner.number_of_failed_tests);
+
+		$finish_and_return(test_runner.number_of_failed_tests > 0 ? 1 : 0);
 	endtask
 endmodule

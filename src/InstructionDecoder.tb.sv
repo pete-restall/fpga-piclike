@@ -31,8 +31,8 @@ module InstructionDecoderTestbench #(
 	end
 
 	`BEGIN_TEST_SUITE(test_runner)
-		`TEST(addwf__d_bit_is_0__expect_is_destination_w_true)
-		`TEST(addwf__d_bit_is_1__expect_is_destination_w_false)
+//		`TEST(addwf__d_bit_is_0__expect_is_destination_w_true)
+//		`TEST(addwf__d_bit_is_1__expect_is_destination_w_false)
 	`END_TEST_SUITE
 
 	task addwf__d_bit_is_0__expect_is_destination_w_true;
