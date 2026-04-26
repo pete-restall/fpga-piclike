@@ -30,7 +30,7 @@ jobs:
       - name: Test and Synthesise
         run: |
           set -e;
-          SV2V="${GITHUB_WORKSPACE}/build/tools/svc2v/bin/sv2v";
+          SV2V="${GITHUB_WORKSPACE}/build/tools/sv2v/bin/sv2v";
           pushd "${GITHUB_WORKSPACE}/build";
           make --version;
           make all "SV2V=${SV2V}";
