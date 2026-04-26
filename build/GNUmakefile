@@ -243,12 +243,11 @@ $(foreach i,$(all_possible_args), \
 )
 
 basename_dot_suffix = $(call _basename_dot_suffix,$(1),$(all_possible_args))
-_basename_dot_suffix = $(let head tail,$(2), \
-	$(call _remove_dot_$(head)_suffix, \
-		$(if $(tail), \
-			$(call _basename_dot_suffix,$(1),$(tail)), \
-			$(basename $(1))) \
-	) \
+_basename_dot_suffix = $(if $(firstword $(2)), \
+	$(call _remove_dot_$(firstword $(2))_suffix, \
+		$(call _basename_dot_suffix,$(1), $(wordlist 2,$(words $(2)),$(2))) \
+	), \
+	$(basename $(1)) \
 )
 
 .PHONY: %.$(IVERILOG_DEPS_EXT)
