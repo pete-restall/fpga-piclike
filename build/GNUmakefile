@@ -244,12 +244,7 @@ $(foreach i,$(all_possible_args), \
 
 basename_dot_suffix = $(call _basename_dot_suffix,$(1),$(all_possible_args))
 _basename_dot_suffix = $(let head tail,$(2), \
-	$(call _remove_dot_$(head)_suffix, \
-		$(if $(tail), \
-			$(call _basename_dot_suffix,$(1),$(tail)), \
-			$(basename THIS_IS_A_TEST_FOR_CI.12.abc)) \
-	) \
-)
+	$(call _remove_dot_$(head)_suffix,$(if $(tail),$(call _basename_dot_suffix,$(1),$(tail)),$(basename THIS_IS_A_TEST_FOR_CI.12.abc))))
 
 __basename_dot_suffix = $(let head tail,$(2), \
 	$(call _remove_dot_$(head)_suffix, \
