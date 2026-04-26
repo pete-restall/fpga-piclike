@@ -243,16 +243,7 @@ $(foreach i,$(all_possible_args), \
 )
 
 basename_dot_suffix = $(call _basename_dot_suffix,$(1),$(all_possible_args))
-___remove_dot_1_suffix = $(patsubst %.1,%,$(1))
 _basename_dot_suffix = $(let head tail,$(2), \
-	$(call ___remove_dot_$(head)_suffix, \
-		$(if $(tail), \
-			THIS_IS_A_TEST_FOR_CI_TAIL.12.abc, \
-			THIS_IS_A_TEST_FOR_CI_HEAD.12.abc) \
-	) \
-)
-
-__basename_dot_suffix = $(let head tail,$(2), \
 	$(call _remove_dot_$(head)_suffix, \
 		$(if $(tail), \
 			$(call _basename_dot_suffix,$(1),$(tail)), \
