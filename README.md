@@ -11,6 +11,7 @@ Required packages for building, testing and verification:
 - `icestorm` - utilities for working with iCE40 FPGAs and bitstreams
 - `iverilog` - Verilog simulator
 - `nextpnr` - synthesis tool for placing and routing
+- `sv2v` - conversion of SystemVerilog into Verilog for wider tool compatibility and semantic agreement
 - `yosys` - various front-end tools for formal verification and synthesis
 
 ## Conventions
@@ -21,15 +22,18 @@ The build infrastructure in this repository works off some conventions:
 - In the case of synthesis, the Composition Root is the top-level `module`; for simulation it is a Testbench or Formal Verification Proof
 - Top-Level Modules:
   - Have a file extension of `.top.sv`; `.v` is used for `sv2v` pre-processed output
-  - Must have a constraints file named `{BASENAME}.pcf`
+  - Must have a constraints file named `{BASENAME}.{TARGET}.pcf` in order to be synthesisable
+  - Can have a side-by-side file named `{BASENAME}.{TARGET}.args` containing arguments for module parameters and definitions; one line corresponds to one synthesised output variant
 - Testbenches:
   - Live side-by-side with the `module` under test
   - Have a file named the same as the `module` under test, with an extension of `.tb.sv`
   - Have a `module` named `{BASENAME}Testbench` which is the top-level
+  - Can have a side-by-side file named `{FILENAME}.args` containing arguments for module parameters and definitions; one line corresponds to one run
 - Formal Verification Proofs:
   - Live side-by-side with the `module` under test
   - Have a file named the same as the `module` under test, with an extension of `.fv.sv`
   - Have a `module` named `{BASENAME}FormalVerification` which is the top-level
+  - Can have a side-by-side file named `{FILENAME}.args` containing arguments for module parameters and definitions; one line corresponds to one run
 - SystemVerilog / Verilog `module`s:
   - Have a file extension of `.sv`; `.v` is used for `sv2v` pre-processed output
   - Have a `module` named `{BASENAME}` to allow them to be automatically discovered by the tooling
