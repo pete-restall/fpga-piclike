@@ -1,12 +1,14 @@
 SYNTH_TARGET :=
+PNR_PACKAGE :=
 
 SRC_DIR := ../src
 OUT_DIR := out
 OUT_OBJ_DIR := $(OUT_DIR)/obj
 OUT_TESTBENCHES_DIR := $(OUT_DIR)/testbenches
-OUT_VERIFICATION_DIR := $(OUT_DIR)/verification
-OUT_TOP_DIR := $(OUT_DIR)/toplevel
-OUT_DOC_DIR := $(OUT_DIR)/doc
+OUT_VERIFICATION_DIR := $(OUT_DIR)/proofs
+OUT_SYNTH_DIR := $(OUT_DIR)/synth
+OUT_PNR_DIR := $(OUT_DIR)/pnr
+OUT_DOC_DIR := $(OUT_DIR)/docs
 
 SHELL := bash
 NULL_FD := /dev/null
@@ -19,6 +21,7 @@ OBJ_YS_EXT := ys
 OBJ_BLIF_EXT := blif
 OBJ_EDIF_EXT := edif
 OBJ_JSON_EXT := json
+OBJ_ASC_EXT := asc
 
 ARGS_EXT := args
 MAX_ARGS := 16
@@ -78,17 +81,23 @@ YOSYS_SYNTH_FLAGS := $(YOSYS_ALL_FLAGS)
 ########
 
 synth_target = $(if $(SYNTH_TARGET),$(SYNTH_TARGET),generic)
+pnr_package = $(if $(PNR_PACKAGE),$(PNR_PACKAGE),none)
+
 find_src = $(call find_files,$(SRC_DIR),$(1))
 find_files = $(shell find '$(1)' -type f -name '$(2)' 2> '$(NULL_FD)')
+src_top_to_pcf = $(wildcard $(1:%.$(TOP_SRC_EXT)=%.$(call synth_target)-$(if $(PNR_PACKAGE),$(PNR_PACKAGE),*).$(SRC_PCF_EXT)))
 src_to_obj = $(patsubst $(SRC_DIR)/%,$(OUT_OBJ_DIR)/%,$(1:%.$(2)=%.$(3)))
 src_to_testbench_passes = $(patsubst $(SRC_DIR)/%,$(OUT_TESTBENCHES_DIR)/%,$(1:%.$(SRC_EXT)=%.$(PASS_EXT)))
 src_to_verification_passes = $(patsubst $(SRC_DIR)/%,$(OUT_VERIFICATION_DIR)/%,$(1:%.$(SRC_EXT)=%.$(PASS_EXT)))
-src_to_synthesis_done = $(patsubst $(SRC_DIR)/%,$(OUT_SYNTH_DIR)/%,$(1:%.$(SYNTH_PCF_EXT)=%.$(DONE_EXT)))
+src_to_synthesis_done = $(patsubst $(SRC_DIR)/%,$(OUT_SYNTH_DEV_DIR)/%,$(1:%.$(TOP_SRC_EXT)=%.$(DONE_EXT)))
+synthesis_to_pnr_done = $(patsubst $(OUT_SYNTH_DEV_DIR)/%,$(OUT_PNR_PKG_DIR)/%,$(1))
 doc_to_obj = $(patsubst $(SRC_DIR)/%,$(DOC_OBJ_DIR)/%,$(1:%.$(2)=%.$(3)))
 
-OUT_SYNTH_DIR := $(OUT_TOP_DIR)/$(call synth_target)
-SYNTH_PCF_EXT := $(call synth_target).$(SRC_PCF_EXT)
+OUT_SYNTH_DEV_DIR := $(OUT_SYNTH_DIR)/$(call synth_target)
 SYNTH_ARGS_EXT := $(call synth_target).$(ARGS_EXT)
+
+OUT_PNR_PKG_DIR := $(OUT_PNR_DIR)/$(call synth_target)/$(call pnr_package)
+PNR_SRC_PCF_EXT := $(call synth_target)-$(call pnr_package).$(SRC_PCF_EXT)
 
 TB_SRC := $(call find_src,*.$(TB_SRC_EXT))
 TB_ALL_PASSED := $(call src_to_testbench_passes,$(TB_SRC))
@@ -98,8 +107,11 @@ FV_SBY_OBJ := $(call src_to_obj,$(FV_SRC),$(FV_SRC_EXT),$(OBJ_SBY_EXT))
 FV_ALL_PROVED := $(call src_to_verification_passes,$(FV_SRC))
 
 TOP_SRC := $(call find_src,*.$(TOP_SRC_EXT))
-SYNTH_PCF_SRC := $(strip $(foreach top,$(TOP_SRC),$(wildcard $(top:%.$(TOP_SRC_EXT)=%.$(SYNTH_PCF_EXT)))))
-SYNTH_ALL_DONE := $(call src_to_synthesis_done,$(SYNTH_PCF_SRC))
+SYNTH_TOP_WITH_PCF_SRC := $(strip $(foreach top,$(TOP_SRC),$(if $(call src_top_to_pcf,$(top)),$(top))))
+SYNTH_ALL_DONE := $(call src_to_synthesis_done,$(SYNTH_TOP_WITH_PCF_SRC))
+
+PNR_ALL_DONE :=  $(call synthesis_to_pnr_done,$(SYNTH_ALL_DONE))
+PNR_PCF_SRC := $(strip $(foreach top,$(TOP_SRC),$(call src_top_to_pcf,$(top))))
 
 MAKE_DEPS := $(call find_files,$(OUT_OBJ_DIR),*.$(MAKE_DEPS_EXT))
 
@@ -120,7 +132,7 @@ help:
 	@echo '    clean          Remove all build artefacts';
 	@echo '    docs           Build documentation';
 	@echo '    help           This message (default)';
-	@echo '    pnr            Place and Route';
+	@echo '    pnr            Place and Route; provide values for SYNTH_TARGET and PNR_PACKAGE';
 	@echo '    proofs         Verify all formal proofs (*.$(FV_SRC_EXT))';
 	@echo '    synth          Synthesise; provide a value for SYNTH_TARGET';
 	@echo '    testbenches    Run all testbenches (*.$(TB_SRC_EXT))';
@@ -129,7 +141,7 @@ help:
 all: testbenches proofs synth pnr bits docs
 
 testbenches: $(TB_ALL_PASSED)
-	$(foreach pass,$<, \
+	$(foreach pass,$^, \
 		@set -e; \
 		[ -f '$(pass)' ] || (echo && echo '*** Not all testbenches passed; fix the failing ones and re-run "make testbenches".' && echo && exit 1); \
 	)
@@ -140,10 +152,11 @@ synth: $(SYNTH_ALL_DONE)
 	@set -e; \
 	[ $(words $^) -gt 0 ] || ( echo && echo '*** No valid synthesis target specified; run "make synth SYNTH_TARGET=..."' && echo && exit 1 );
 
-pnr:
-	@echo '[PNR     ] TODO: RUN PNR';
+pnr: $(PNR_ALL_DONE)
+	@set -e; \
+	[ $(words $^) -gt 0 ] || ( echo && echo '*** No valid package specified; run "make pnr SYNTH_TARGET=... PNR_PACKAGE=..."' && echo && exit 1 );
 
-bits:
+bits: pnr
 	@echo '[BITS    ] TODO: RUN BITSTREAM COMPILER';
 
 docs: $(DOC_MD_OBJ) $(DOC_WAVEDROM_OBJ)
@@ -230,7 +243,7 @@ $(OUT_DOC_DIR)/%.$(DOC_WAVEDROM_OBJ_EXT).svg: $(SRC_DIR)/%.$(DOC_WAVEDROM_SRC_EX
 
 all_possible_args := $(shell seq $(MAX_ARGS))
 
-define DEFINE_PARAMETERISED_TOP_RECIPE
+define DEFINE_PARAMETERISED_TOP_DEPS_RECIPE
 	@set -e; \
 	top_module_name='$$(call top_module_name_from_src)'; \
 	args_file='$$(lastword $$^)'; \
@@ -250,15 +263,15 @@ endef
 define DEFINE_PARAMETERISED_TOP_RECIPES
 .PRECIOUS: $(OUT_TESTBENCHES_DIR)/%.$(i).$(IVERILOG_DEPS_EXT)
 $(OUT_TESTBENCHES_DIR)/%.$(i).$(IVERILOG_DEPS_EXT): $(SRC_DIR)/%.$(SRC_EXT) $(OUT_TESTBENCHES_DIR)/%.$(i).$(ARGS_EXT)
-	$(DEFINE_PARAMETERISED_TOP_RECIPE)
+	$(DEFINE_PARAMETERISED_TOP_DEPS_RECIPE)
 
 .PRECIOUS: $(OUT_VERIFICATION_DIR)/%.$(i).$(IVERILOG_DEPS_EXT)
 $(OUT_VERIFICATION_DIR)/%.$(i).$(IVERILOG_DEPS_EXT): $(SRC_DIR)/%.$(SRC_EXT) $(OUT_VERIFICATION_DIR)/%.$(i).$(ARGS_EXT)
-	$(DEFINE_PARAMETERISED_TOP_RECIPE)
+	$(DEFINE_PARAMETERISED_TOP_DEPS_RECIPE)
 
-.PRECIOUS: $(OUT_SYNTH_DIR)/%.$(i).$(IVERILOG_DEPS_EXT)
-$(OUT_SYNTH_DIR)/%.$(i).$(IVERILOG_DEPS_EXT): $(SRC_DIR)/%.$(TOP_SRC_EXT) $(OUT_SYNTH_DIR)/%.$(i).$(ARGS_EXT)
-	$(DEFINE_PARAMETERISED_TOP_RECIPE)
+.PRECIOUS: $(OUT_SYNTH_DEV_DIR)/%.$(i).$(IVERILOG_DEPS_EXT)
+$(OUT_SYNTH_DEV_DIR)/%.$(i).$(IVERILOG_DEPS_EXT): $(SRC_DIR)/%.$(TOP_SRC_EXT) $(OUT_SYNTH_DEV_DIR)/%.$(i).$(ARGS_EXT)
+	$(DEFINE_PARAMETERISED_TOP_DEPS_RECIPE)
 
 _remove_dot_$(i)_suffix = $$(patsubst %.$(i),%,$$(1))
 endef
@@ -398,45 +411,71 @@ $(OUT_TESTBENCHES_DIR)/%.$(LOG_EXT): $(OUT_TESTBENCHES_DIR)/%.$(OBJ_VVP_EXT)
 
 include Makefile.ice40
 
-.PRECIOUS: $(OUT_SYNTH_DIR)/%.$(DONE_EXT)
-$(OUT_SYNTH_DIR)/%.$(DONE_EXT): $(OUT_SYNTH_DIR)/%.$(MAKE_DEPS_EXT)
+.PRECIOUS: $(OUT_SYNTH_DEV_DIR)/%.$(DONE_EXT)
+$(OUT_SYNTH_DEV_DIR)/%.$(DONE_EXT): $(OUT_SYNTH_DEV_DIR)/%.$(MAKE_DEPS_EXT)
 	@set -e; \
 	touch '$@';
 
-.PRECIOUS: $(OUT_SYNTH_DIR)/%.$(OBJ_PCF_EXT)
-$(OUT_SYNTH_DIR)/%.$(OBJ_PCF_EXT): $(OUT_SYNTH_DIR)/%.$(MAKE_DEPS_EXT)
-	@set -e; \
-	src_pcf='$(filter %.$(SYNTH_PCF_EXT),$^)'; \
-	echo "[COPY    ] Device constraints ($${src_pcf} -> $@)"; \
-	[ -f "$${src_pcf}" ] || (echo '*** No PCF prerequisite for $@' && exit 1); \
-	cp "$${src_pcf}" '$@';
-
-.PRECIOUS: $(OUT_SYNTH_DIR)/%.$(OBJ_BLIF_EXT) $(OUT_SYNTH_DIR)/%.$(OBJ_EDIF_EXT) $(OUT_SYNTH_DIR)/%.$(OBJ_JSON_EXT)
-$(OUT_SYNTH_DIR)/%.$(OBJ_BLIF_EXT) $(OUT_SYNTH_DIR)/%.$(OBJ_EDIF_EXT) $(OUT_SYNTH_DIR)/%.$(OBJ_JSON_EXT): $(OUT_SYNTH_DIR)/%.$(OBJ_YS_EXT)
+.PRECIOUS: $(OUT_SYNTH_DEV_DIR)/%.$(OBJ_BLIF_EXT) $(OUT_SYNTH_DEV_DIR)/%.$(OBJ_EDIF_EXT) $(OUT_SYNTH_DEV_DIR)/%.$(OBJ_JSON_EXT)
+$(OUT_SYNTH_DEV_DIR)/%.$(OBJ_BLIF_EXT) $(OUT_SYNTH_DEV_DIR)/%.$(OBJ_EDIF_EXT) $(OUT_SYNTH_DEV_DIR)/%.$(OBJ_JSON_EXT): $(OUT_SYNTH_DEV_DIR)/%.$(OBJ_YS_EXT)
 	@set -e; \
 	echo '[YOSYS   ] Synthesising ($< -> $@)'; \
 	$(YOSYS) $(YOSYS_SYNTH_FLAGS) -s '$<'; \
 	mv 'abc.history' '$(basename $@).abc' 2>'$(NULL_FD)';
 
-.PRECIOUS: $(OUT_SYNTH_DIR)/%.$(MAKE_DEPS_EXT) $(OUT_SYNTH_DIR)/%.$(ARGS_EXT)
-$(OUT_SYNTH_DIR)/%.$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(SYNTH_ARGS_EXT) $(SRC_DIR)/%.$(TOP_SRC_EXT)
+.PRECIOUS: $(OUT_SYNTH_DEV_DIR)/%.$(MAKE_DEPS_EXT) $(OUT_SYNTH_DEV_DIR)/%.$(ARGS_EXT)
+$(OUT_SYNTH_DEV_DIR)/%.$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(SYNTH_ARGS_EXT) $(SRC_DIR)/%.$(TOP_SRC_EXT)
 	@set -e; \
-	echo '[DEPENDS ] $(call top_module_name_from_src): Creating Top-Level Makefile dependencies and arguments ($< -> $@)'; \
+	echo '[DEPENDS ] $(call top_module_name_from_src): Creating Top-Level Synthesis Makefile dependencies and arguments ($< -> $@)'; \
 	mkdir -p '$(dir $@)'; \
 	num_args=$$(wc -l < '$<'); \
 	seq $${num_args} | xargs -S 4096 -I ^ '$(SHELL)' -c "head -n ^ '$<' | tail -n 1 > '$(@:%.$(MAKE_DEPS_EXT)=%.^.$(ARGS_EXT))'"; \
-	seq $${num_args} | xargs -S 4096 -I ^ echo '$(@:%.$(MAKE_DEPS_EXT)=%.$(DONE_EXT)) : $(foreach obj_ext,$(OBJ_PCF_EXT) $(OBJ_BLIF_EXT) $(OBJ_EDIF_EXT) $(OBJ_JSON_EXT),$(@:%.$(MAKE_DEPS_EXT)=%.^.$(obj_ext)))' > '$@'; \
-	seq $${num_args} | xargs -S 4096 -I ^ echo '$(@:%.$(MAKE_DEPS_EXT)=%.^.$(ARGS_EXT)) : $@' >> '$@'; \
-	seq $${num_args} | xargs -S 4096 -I ^ echo '$(@:%.$(MAKE_DEPS_EXT)=%.^.$(OBJ_PCF_EXT)) : $(@:$(OUT_SYNTH_DIR)/%.$(MAKE_DEPS_EXT)=$(SRC_DIR)/%.$(SYNTH_PCF_EXT))' >> '$@';
+	seq $${num_args} | xargs -S 4096 -I ^ echo '$(@:%.$(MAKE_DEPS_EXT)=%.$(DONE_EXT)) : $(foreach obj_ext,$(OBJ_BLIF_EXT) $(OBJ_EDIF_EXT) $(OBJ_JSON_EXT),$(@:%.$(MAKE_DEPS_EXT)=%.^.$(obj_ext)))' > '$@'; \
+	seq $${num_args} | xargs -S 4096 -I ^ echo '$(@:%.$(MAKE_DEPS_EXT)=%.^.$(ARGS_EXT)) : $@' >> '$@';
 
-$(OUT_SYNTH_DIR)/%.$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(TOP_SRC_EXT)
+$(OUT_SYNTH_DEV_DIR)/%.$(MAKE_DEPS_EXT): $(SRC_DIR)/%.$(TOP_SRC_EXT)
 	@set -e; \
-	echo '[DEPENDS ] $(call top_module_name_from_src): Creating Top-Level Makefile dependencies and arguments ($< -> $@)'; \
+	echo '[DEPENDS ] $(call top_module_name_from_src): Creating Top-Level Synthesis Makefile dependencies and arguments ($< -> $@)'; \
 	mkdir -p '$(dir $@)'; \
 	echo '' > '$(@:%.$(MAKE_DEPS_EXT)=%.1.$(ARGS_EXT))'; \
-	echo '$(@:%.$(MAKE_DEPS_EXT)=%.$(DONE_EXT)) : $(foreach obj_ext,$(OBJ_PCF_EXT) $(OBJ_BLIF_EXT) $(OBJ_EDIF_EXT) $(OBJ_JSON_EXT),$(@:%.$(MAKE_DEPS_EXT)=%.1.$(obj_ext)))' > '$@'; \
-	echo '$(@:%.$(MAKE_DEPS_EXT)=%.1.$(ARGS_EXT)) : $@' >> '$@'; \
-	echo '$(@:%.$(MAKE_DEPS_EXT)=%.1.$(OBJ_PCF_EXT)) : $(@:$(OUT_SYNTH_DIR)/%.$(MAKE_DEPS_EXT)=$(SRC_DIR)/%.$(SYNTH_PCF_EXT))' >> '$@';
+	echo '$(@:%.$(MAKE_DEPS_EXT)=%.$(DONE_EXT)) : $(foreach obj_ext,$(OBJ_BLIF_EXT) $(OBJ_EDIF_EXT) $(OBJ_JSON_EXT),$(@:%.$(MAKE_DEPS_EXT)=%.1.$(obj_ext)))' > '$@'; \
+	echo '$(@:%.$(MAKE_DEPS_EXT)=%.1.$(ARGS_EXT)) : $@' >> '$@';
 
 # TODO: a 'make help' or 'make clean' will run the rule to include these, even if we're not building anything; we rely on this behaviour for testbenches, but for everything else it should be a conditional include (but how ?)
-include $(patsubst $(SRC_DIR)/%.$(TOP_SRC_EXT),$(OUT_SYNTH_DIR)/%.$(MAKE_DEPS_EXT),$(TOP_SRC))
+include $(patsubst $(SRC_DIR)/%.$(TOP_SRC_EXT),$(OUT_SYNTH_DEV_DIR)/%.$(MAKE_DEPS_EXT),$(TOP_SRC))
+
+
+### Place and Route...
+
+.PRECIOUS: $(OUT_PNR_PKG_DIR)/%.$(DONE_EXT)
+$(OUT_PNR_PKG_DIR)/%.$(DONE_EXT): $(OUT_PNR_PKG_DIR)/%.$(MAKE_DEPS_EXT)
+	@set -e; \
+	[ $(words $^) -gt 1 ] || (echo && echo '*** No synthesis JSON prerequisites for $@; check $<' && exit 1); \
+	touch '$@';
+
+.PRECIOUS: $(OUT_PNR_PKG_DIR)/%.$(OBJ_PCF_EXT)
+$(OUT_PNR_PKG_DIR)/%.$(OBJ_PCF_EXT): # Prerequisites are added by the generated makefile (below)
+	@set -e; \
+	[ -f '$<' ] || (echo && echo '*** No PCF prerequisite for $@; check $<' && exit 1); \
+	echo "[COPY    ] Device constraints ($< -> $@)"; \
+	cp '$<' '$@';
+
+.PRECIOUS: $(OUT_PNR_PKG_DIR)/%.$(MAKE_DEPS_EXT)
+$(OUT_PNR_PKG_DIR)/%.$(MAKE_DEPS_EXT): $(OUT_SYNTH_DEV_DIR)/%.$(MAKE_DEPS_EXT)
+	@set -e; \
+	num_args=$(words $(wildcard $(@:$(OUT_PNR_PKG_DIR)/%.$(MAKE_DEPS_EXT)=$(OUT_SYNTH_DEV_DIR)/%.*.$(ARGS_EXT)))); \
+	echo "[DEPENDS ] $(call top_module_name_from_src): Creating Top-Level PNR Makefile dependencies for $${num_args} variants ($< -> $@)"; \
+	[ $${num_args} -gt 0 ] || (echo && echo '*** No PNR PCF prerequisites for $@; check for corresponding *.$(ARGS_EXT) in $(OUT_SYNTH_DEV_DIR)' && exit 1); \
+	mkdir -p '$(dir $@)'; \
+	seq $${num_args} | xargs -S 4096 -I ^ echo '$(@:%.$(MAKE_DEPS_EXT)=%.$(DONE_EXT)) : $(foreach obj_ext,$(OBJ_JSON_EXT) $(OBJ_PCF_EXT),$(@:%.$(MAKE_DEPS_EXT)=%.^.$(obj_ext)))' >> '$@'; \
+	seq $${num_args} | xargs -S 4096 -I ^ echo '$(@:%.$(MAKE_DEPS_EXT)=%.^.$(OBJ_PCF_EXT)) : $(@:$(OUT_PNR_PKG_DIR)/%.$(MAKE_DEPS_EXT)=$(SRC_DIR)/%.$(PNR_SRC_PCF_EXT))' >> '$@';
+
+# TODO: a 'make help' or 'make clean' will run the rule to include these, even if we're not building anything; we rely on this behaviour for testbenches, but for everything else it should be a conditional include (but how ?)
+include $(patsubst $(SRC_DIR)/%.$(TOP_SRC_EXT),$(OUT_PNR_PKG_DIR)/%.$(MAKE_DEPS_EXT),$(TOP_SRC))
+
+.PHONY: $(OUT_PNR_PKG_DIR)/%.$(OBJ_JSON_EXT)
+$(OUT_PNR_PKG_DIR)/%.$(OBJ_JSON_EXT):
+	@set -e; \
+	echo; \
+	echo '*** No JSON prerequisite for $@; check SYNTH_TARGET ($(SYNTH_TARGET)) and PNR_PACKAGE ($(PNR_PACKAGE)) are correct' \
+	exit 1;

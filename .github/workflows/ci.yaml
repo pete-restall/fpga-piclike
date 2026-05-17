@@ -33,7 +33,7 @@ jobs:
           SV2V="${GITHUB_WORKSPACE}/build/tools/sv2v/bin/sv2v";
           pushd "${GITHUB_WORKSPACE}/build";
           make --version;
-          make all "SV2V=${SV2V}" SYNTH_TARGET=ice40up5k;
+          make all "SV2V=${SV2V}" SYNTH_TARGET=ice40up5k PNR_PACKAGE=sg48;
           popd;
 
       - uses: actions/upload-artifact@v6

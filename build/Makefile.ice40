@@ -1,4 +1,5 @@
-OUT_ICE40UP5K_DIR := $(OUT_TOP_DIR)/ice40up5k
+OUT_SYNTH_ICE40UP5K_DIR := $(OUT_SYNTH_DIR)/ice40up5k
+OUT_PNR_ICE40UP5K_SG48_DIR := $(OUT_PNR_DIR)/ice40up5k/sg48
 
 define script_create_synth_ice40up5k_ys
 	cat > '$@' <<-EOF
@@ -12,7 +13,23 @@ endef
 
 export script_create_synth_ice40up5k_ys
 
-.PRECIOUS: $(OUT_ICE40UP5K_DIR)/%.$(OBJ_YS_EXT)
-$(OUT_ICE40UP5K_DIR)/%.$(OBJ_YS_EXT): $(OUT_ICE40UP5K_DIR)/%.$(OBJ_EXT) $(OUT_ICE40UP5K_DIR)/%.$(ARGS_EXT)
+.PRECIOUS: $(OUT_SYNTH_ICE40UP5K_DIR)/%.$(OBJ_YS_EXT)
+$(OUT_SYNTH_ICE40UP5K_DIR)/%.$(OBJ_YS_EXT): $(OUT_SYNTH_ICE40UP5K_DIR)/%.$(OBJ_EXT) $(OUT_SYNTH_ICE40UP5K_DIR)/%.$(ARGS_EXT)
 	@set -e; \
 	eval "$${script_create_synth_ice40up5k_ys}";
+
+.PRECIOUS: $(OUT_PNR_ICE40UP5K_SG48_DIR)/%.$(OBJ_JSON_EXT) $(OUT_PNR_ICE40UP5K_SG48_DIR)/%.$(OBJ_ASC_EXT) $(OUT_PNR_ICE40UP5K_SG48_DIR)/%.report.$(OBJ_JSON_EXT)
+$(OUT_PNR_ICE40UP5K_SG48_DIR)/%.$(OBJ_JSON_EXT) $(OUT_PNR_ICE40UP5K_SG48_DIR)/%.$(OBJ_ASC_EXT): $(OUT_SYNTH_ICE40UP5K_DIR)/%.$(OBJ_JSON_EXT) $(OUT_PNR_ICE40UP5K_SG48_DIR)/%.$(OBJ_PCF_EXT)
+	@set -e; \
+	nextpnr-ice40 \
+		--up5k \
+		--package sg48 \
+		--json '$<' \
+		--write '$(@:%.$(OBJ_ASC_EXT)=%.$(OBJ_JSON_EXT))' \
+		--report '$(@:%.$(OBJ_ASC_EXT)=%.report.$(OBJ_JSON_EXT))' \
+		--pcf '$(lastword $^)' \
+		--asc '$(@:%.$(OBJ_JSON_EXT)=%.$(OBJ_ASC_EXT))' \
+		--detailed-timing-report;
+
+# TODO: bits...
+#icepack piclike.asc piclike.bin;

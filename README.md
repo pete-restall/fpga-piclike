@@ -10,7 +10,7 @@ Required packages for building, testing and verification:
 - `gmake` - GNU Make
 - `icestorm` - utilities for working with iCE40 FPGAs and bitstreams
 - `iverilog` - Verilog simulator
-- `nextpnr` - synthesis tool for placing and routing
+- `nextpnr` - implementation tool for placing and routing (PnR)
 - `sv2v` - conversion of SystemVerilog into Verilog for wider tool compatibility and semantic agreement
 - `yosys` - various front-end tools for formal verification and synthesis
 
@@ -22,7 +22,7 @@ The build infrastructure in this repository works off some conventions:
 - In the case of synthesis, the Composition Root is the top-level `module`; for simulation it is a Testbench or Formal Verification Proof
 - Top-Level Modules:
   - Have a file extension of `.top.sv`; `.v` is used for `sv2v` pre-processed output
-  - Must have a constraints file named `{BASENAME}.{TARGET}.pcf` in order to be synthesisable
+  - Must have at least one constraints file named `{BASENAME}.{TARGET}-{PACKAGE}.pcf` in order to be synthesisable; `{TARGET}` is the device, eg. `ice40up5k` and `{PACKAGE}` is the physical package, eg. `sg48`.  For synthesis, only `{TARGET}` needs to be taken into account, but PnR requires `{PACKAGE}`.
   - Can have a side-by-side file named `{BASENAME}.{TARGET}.args` containing arguments for module parameters and definitions; one line corresponds to one synthesised output variant
 - Testbenches:
   - Live side-by-side with the `module` under test
